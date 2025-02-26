@@ -15,7 +15,7 @@ class Video
                     FROM movie_videos v
                     JOIN movies m ON v.movie_id = m.id
                     WHERE v.movie_id = :movie_id
-                    ORDER BY v.part_number ASC";
+                    ORDER BY v.id ASC";
 
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':movie_id', $movieId, PDO::PARAM_INT);
@@ -30,8 +30,7 @@ class Video
     public static function find(PDO $db, int $id): ?array
     {
         try {
-            $sql = "SELECT v.*, m.title as movie_title,
-                    m.code as movie_code, m.id as movie_id
+            $sql = "SELECT v.*, m.title as movie_title, m.id as movie_id
                     FROM movie_videos v
                     JOIN movies m ON v.movie_id = m.id
                     WHERE v.id = :id";
@@ -52,11 +51,11 @@ class Video
             $sql = "SELECT v.*, m.title as movie_title
                     FROM movie_videos v
                     JOIN movies m ON v.movie_id = m.id
-                    WHERE v.movie_id = :movie_id AND v.part_number = :part_number";
+                    WHERE v.movie_id = :movie_id AND v.id = :id";
 
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':movie_id', $movieId, PDO::PARAM_INT);
-            $stmt->bindValue(':part_number', $partNumber, PDO::PARAM_INT);
+            $stmt->bindValue(':id', $partNumber, PDO::PARAM_INT);
             $stmt->execute();
 
             return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
@@ -68,7 +67,7 @@ class Video
     public static function getNextPartNumber(PDO $db, int $movieId): int
     {
         try {
-            $sql = "SELECT MAX(part_number) as max_part 
+            $sql = "SELECT MAX(id) as max_part 
                     FROM movie_videos 
                     WHERE movie_id = :movie_id";
 
@@ -88,33 +87,22 @@ class Video
         try {
             $db->beginTransaction();
 
-            // Check if movie exists
             $movie = Movie::find($db, $data['movie_id']);
             if (!$movie) {
                 throw new Exception("Kino topilmadi");
             }
 
-            // Check if part number exists
-            if (self::findByPart($db, $data['movie_id'], $data['part_number'])) {
-                throw new Exception("Bu qism raqami allaqachon mavjud");
-            }
-
             $sql = "INSERT INTO movie_videos (
-                        movie_id, title, video_file_id, part_number,
-                        duration, file_size, created_at
+                        movie_id, title, file_id, created_at
                     ) VALUES (
-                        :movie_id, :title, :video_file_id, :part_number,
-                        :duration, :file_size, NOW()
+                        :movie_id, :title, :file_id, NOW()
                     )";
 
             $stmt = $db->prepare($sql);
             $stmt->execute([
                 'movie_id' => $data['movie_id'],
                 'title' => $data['title'],
-                'video_file_id' => $data['video_file_id'],
-                'part_number' => $data['part_number'],
-                'duration' => $data['duration'] ?? null,
-                'file_size' => $data['file_size'] ?? null
+                'file_id' => $data['file_id']
             ]);
 
             $videoId = $db->lastInsertId();
@@ -136,14 +124,6 @@ class Video
             $video = self::find($db, $id);
             if (!$video) {
                 throw new Exception("Video topilmadi");
-            }
-
-            // Check if part number exists for another video
-            if (isset($data['part_number'])) {
-                $existing = self::findByPart($db, $video['movie_id'], $data['part_number']);
-                if ($existing && $existing['id'] !== $id) {
-                    throw new Exception("Bu qism raqami allaqachon mavjud");
-                }
             }
 
             $fields = [];
@@ -202,8 +182,8 @@ class Video
             // Update part numbers to ensure sequential ordering
             foreach ($videos as $index => $video) {
                 $newPartNumber = $index + 1;
-                if ($video['part_number'] !== $newPartNumber) {
-                    self::update($db, $video['id'], ['part_number' => $newPartNumber]);
+                if ($video['id'] !== $newPartNumber) {
+                    self::update($db, $video['id'], ['id' => $newPartNumber]);
                 }
             }
 

@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+date_default_timezone_set("Asia/Tashkent");
 
 require_once __DIR__ . '/vendor/autoload.php';
 require_once __DIR__ . '/config/bot.php';

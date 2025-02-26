@@ -62,29 +62,6 @@ class MessageHandler
                 }
 
                 State::setState($bot, 'movie_title', $text);
-                State::setState($bot, 'state', 'add_movie_code');
-
-                $bot->sendMessage("📝 Endi kino kodini kiriting (unique, masalan: avatar2023):");
-                return true;
-
-            case 'add_movie_code':
-                $code = strtolower(trim($text));
-
-                if (empty($code) || strlen($code) > 100) {
-                    $bot->sendMessage("⚠️ Noto'g'ri kino kodi! Kamida 1 ta, ko'pi bilan 100 ta belgi bo'lishi kerak.");
-                    return true;
-                }
-
-                try {
-                    $existing = Movie::findByCode($db, $code);
-                    if ($existing) {
-                        $bot->sendMessage("⚠️ Bu kod bilan kino allaqachon mavjud. Boshqa kod kiriting:");
-                        return true;
-                    }
-                } catch (\Exception $e) {
-                }
-
-                State::setState($bot, 'movie_code', $code);
                 State::setState($bot, 'state', 'add_movie_year');
 
                 $bot->sendMessage("📅 Endi kino yilini kiriting (masalan: 2023):");
@@ -98,7 +75,7 @@ class MessageHandler
                     return true;
                 }
 
-                State::setState($bot, 'movie_year', (string)$year);
+                State::setState($bot, 'movie_year', $year);
                 State::setState($bot, 'state', 'add_movie_description');
 
                 $bot->sendMessage("📝 Endi kino haqida tavsif kiriting:");
@@ -121,10 +98,9 @@ class MessageHandler
                     try {
                         $movieData = [
                             'title' => $bot->getUserData('movie_title'),
-                            'code' => $bot->getUserData('movie_code'),
                             'description' => $bot->getUserData('movie_description'),
-                            'year' => (int)$bot->getUserData('movie_year'),
-                            'photo_file_id' => $bot->getUserData('movie_photo')
+                            'year' => $bot->getUserData('movie_year'),
+                            'file_id' => $bot->getUserData('movie_photo')
                         ];
 
                         $movieId = Movie::create($db, $movieData);
@@ -169,11 +145,10 @@ class MessageHandler
                 State::setState($bot, 'edit_movie_id', (string)$movieId);
 
                 $bot->sendPhoto(
-                    photo: $movie['photo_file_id'] ?? 'https://via.placeholder.com/400x600?text=No+Image',
+                    photo: $movie['file_id'] ?? 'https://via.placeholder.com/400x600?text=No+Image',
                     caption: "🎬 <b>" . $movie['title'] . "</b>\n\n" .
                         "🆔 <b>ID:</b> " . $movie['id'] . "\n" .
                         "📝 <b>Tavsif:</b> " . $movie['description'] . "\n" .
-                        "🔢 <b>Kod:</b> " . $movie['code'] . "\n" .
                         "📅 <b>Yil:</b> " . $movie['year'] . "\n\n" .
                         "Nimani tahrirlash kerak?",
                     parse_mode: 'HTML',
@@ -224,7 +199,7 @@ class MessageHandler
 
                 State::setState($bot, 'video_part', (string)$partNumber);
 
-                $videoFileId = $bot->getUserData('video_file_id');
+                $videoFileId = $bot->getUserData('file_id');
                 $videoDuration = $bot->getUserData('video_duration');
                 $videoFileSize = $bot->getUserData('video_file_size');
                 $videoTitle = $bot->getUserData('video_title');
@@ -235,7 +210,7 @@ class MessageHandler
                             'movie_id' => (int)$movieId,
                             'title' => $videoTitle,
                             'part_number' => $partNumber,
-                            'video_file_id' => $videoFileId,
+                            'file_id' => $videoFileId,
                             'duration' => $videoDuration,
                             'file_size' => $videoFileSize
                         ];
@@ -262,7 +237,7 @@ class MessageHandler
                         State::setState($bot, 'state', 'add_video');
                         State::setState($bot, 'video_title', null);
                         State::setState($bot, 'video_part', null);
-                        State::setState($bot, 'video_file_id', null);
+                        State::setState($bot, 'file_id', null);
                         State::setState($bot, 'video_duration', null);
                         State::setState($bot, 'video_file_size', null);
                     } catch (\Exception $e) {

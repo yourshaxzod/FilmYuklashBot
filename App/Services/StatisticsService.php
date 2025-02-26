@@ -5,7 +5,7 @@ namespace App\Services;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 use App\Models\{Movie, Video, Channel};
-use App\Helpers\{Formatter, Keyboard, Config, Validator};
+use App\Helpers\{Formatter, Keyboard, Config, Text, Validator};
 use PDO;
 
 class StatisticsService
@@ -22,7 +22,7 @@ class StatisticsService
             $stats = self::collectStats($db);
 
             $bot->sendMessage(
-                text: Formatter::statisticsInfo($stats),
+                text: Text::statisticsInfo($stats),
                 parse_mode: ParseMode::HTML,
                 reply_markup: Keyboard::statisticsActions()
             );
@@ -41,7 +41,7 @@ class StatisticsService
             $stats = self::collectStats($db, true);
 
             $bot->editMessageText(
-                text: Formatter::statisticsInfo($stats),
+                text: Text::statisticsInfo($stats),
                 parse_mode: ParseMode::HTML,
                 reply_markup: Keyboard::statisticsActions()
             );
@@ -92,7 +92,6 @@ class StatisticsService
                 ]
             ];
 
-            // Basic counts
             $sql = "SELECT 
                     (SELECT COUNT(*) FROM movies) as movies,
                     (SELECT COUNT(*) FROM movie_videos) as videos,
@@ -104,11 +103,10 @@ class StatisticsService
             $basicStats = $db->query($sql)->fetch(PDO::FETCH_ASSOC);
             $stats = array_merge($stats, $basicStats);
 
-            // Get top movie
             $sql = "SELECT m.*, 
                     (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) as video_count
                     FROM movies m 
-                    ORDER BY m.views DESC, m.like_count DESC 
+                    ORDER BY m.views DESC, m.likes DESC 
                     LIMIT 1";
 
             $topMovie = $db->query($sql)->fetch(PDO::FETCH_ASSOC);
@@ -116,32 +114,25 @@ class StatisticsService
                 $stats['top_movie'] = $topMovie;
             }
 
-            // Today's stats
             $todayStart = date('Y-m-d 00:00:00');
             $stats['today'] = self::getPeriodStats($db, $todayStart);
 
-            // Week stats
             $weekStart = date('Y-m-d 00:00:00', strtotime('-7 days'));
             $stats['week'] = self::getPeriodStats($db, $weekStart);
 
-            // Month stats
             $monthStart = date('Y-m-d 00:00:00', strtotime('-30 days'));
             $stats['month'] = self::getPeriodStats($db, $monthStart);
 
-            // Most active hours
             $stats['peak_hours'] = self::getPeakHours($db);
 
-            // Most popular genres if exists
             if (self::hasGenreColumn($db)) {
                 $stats['popular_genres'] = self::getPopularGenres($db);
             }
 
-            // Activity trends
             $stats['trends'] = self::getActivityTrends($db);
 
             $db->commit();
 
-            // Cache statistics
             self::cacheStats($stats);
 
             return $stats;
@@ -151,25 +142,24 @@ class StatisticsService
         }
     }
 
-    /**
-     * Get period statistics
-     */
     private static function getPeriodStats(PDO $db, string $startDate): array
     {
         $sql = "SELECT 
-                (SELECT COUNT(*) FROM user_views WHERE viewed_at >= :start_date) as views,
-                (SELECT COUNT(*) FROM user_likes WHERE liked_at >= :start_date) as likes,
-                (SELECT COUNT(*) FROM users WHERE created_at >= :start_date) as new_users";
+            (SELECT COUNT(*) FROM user_views WHERE viewed_at >= :start_date_views) as views,
+            (SELECT COUNT(*) FROM user_likes WHERE liked_at >= :start_date_likes) as likes,
+            (SELECT COUNT(*) FROM users WHERE created_at >= :start_date_users) as new_users";
 
         $stmt = $db->prepare($sql);
-        $stmt->execute(['start_date' => $startDate]);
+
+        $stmt->bindValue(':start_date_views', $startDate, PDO::PARAM_STR);
+        $stmt->bindValue(':start_date_likes', $startDate, PDO::PARAM_STR);
+        $stmt->bindValue(':start_date_users', $startDate, PDO::PARAM_STR);
+
+        $stmt->execute();
 
         return $stmt->fetch(PDO::FETCH_ASSOC);
     }
 
-    /**
-     * Get peak hours
-     */
     private static function getPeakHours(PDO $db): array
     {
         $sql = "SELECT 
@@ -184,16 +174,13 @@ class StatisticsService
         return $db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    /**
-     * Get popular genres if genre column exists
-     */
     private static function getPopularGenres(PDO $db): array
     {
         $sql = "SELECT 
                 genre,
                 COUNT(*) as movie_count,
                 SUM(views) as total_views,
-                SUM(like_count) as total_likes
+                SUM(likes) as total_likes
                 FROM movies
                 WHERE genre IS NOT NULL
                 GROUP BY genre
@@ -203,9 +190,6 @@ class StatisticsService
         return $db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    /**
-     * Get activity trends
-     */
     private static function getActivityTrends(PDO $db): array
     {
         $sql = "SELECT 
@@ -220,9 +204,6 @@ class StatisticsService
         return $db->query($sql)->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    /**
-     * Check if genre column exists
-     */
     private static function hasGenreColumn(PDO $db): bool
     {
         try {
@@ -234,9 +215,6 @@ class StatisticsService
         }
     }
 
-    /**
-     * Get cached statistics
-     */
     private static function getCachedStats(): ?array
     {
         $cacheFile = self::getCacheFile();
@@ -254,9 +232,6 @@ class StatisticsService
         return $cached ? json_decode($cached, true) : null;
     }
 
-    /**
-     * Cache statistics
-     */
     private static function cacheStats(array $stats): void
     {
         $cacheFile = self::getCacheFile();
@@ -269,21 +244,14 @@ class StatisticsService
 
             file_put_contents($cacheFile, json_encode($stats));
         } catch (\Exception $e) {
-            // Ignore cache errors
         }
     }
 
-    /**
-     * Get cache file path
-     */
     private static function getCacheFile(): string
     {
         return __DIR__ . '/../../cache/' . self::CACHE_KEY . '.json';
     }
 
-    /**
-     * Clear statistics cache
-     */
     public static function clearCache(): void
     {
         $cacheFile = self::getCacheFile();

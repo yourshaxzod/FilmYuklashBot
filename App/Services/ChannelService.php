@@ -55,17 +55,14 @@ class ChannelService
         }
 
         try {
-            // Clean username
             $username = ltrim($username, '@');
 
-            // Check if channel already exists
             $existing = Channel::findByUsername($db, $username);
             if ($existing) {
                 Menu::showError($bot, "Bu kanal allaqachon qo'shilgan!");
                 return;
             }
 
-            // Get channel info from Telegram
             try {
                 $chat = $bot->getChat('@' . $username);
 
@@ -74,7 +71,6 @@ class ChannelService
                     return;
                 }
 
-                // Check if bot is admin in the channel
                 $botInfo = $bot->getMe();
                 $chatMember = $bot->getChatMember(
                     chat_id: $chat->id,
@@ -86,7 +82,6 @@ class ChannelService
                     return;
                 }
 
-                // Add channel to database
                 $channelData = [
                     'username' => $username,
                     'title' => $chat->title,
@@ -149,10 +144,9 @@ class ChannelService
             $notSubscribed = Channel::checkUserSubscription($bot, $db, $bot->userId());
 
             if (empty($notSubscribed)) {
-                return true; // User is subscribed to all channels
+                return true;
             }
 
-            // Create message with subscription requirements
             $message = "📢 <b>Botdan foydalanish uchun quyidagi kanallarga obuna bo'ling:</b>\n\n";
 
             $buttons = [];
@@ -169,9 +163,8 @@ class ChannelService
                 reply_markup: Keyboard::getInlineKeyboard($buttons)
             );
 
-            return false; // User needs to subscribe
+            return false;
         } catch (\Exception $e) {
-            // If there's an error checking subscriptions, let the user continue
             return true;
         }
     }
@@ -187,10 +180,6 @@ class ChannelService
                     show_alert: true
                 );
 
-                // Delete the subscription message
-                $bot->deleteMessage();
-
-                // Show main menu
                 Menu::showMainMenu($bot);
 
                 return true;

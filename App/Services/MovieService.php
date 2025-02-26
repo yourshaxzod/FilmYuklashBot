@@ -18,10 +18,8 @@ class MovieService
         try {
             $query = trim($query);
 
-            // Save last search query for pagination
             State::setState($bot, 'last_search_query', $query);
 
-            // If query is numeric, try to find movie by code
             if (Formatter::isNumericString($query)) {
                 $movie = Movie::findByCode($db, $query, $bot->userId());
                 if ($movie) {
@@ -33,8 +31,7 @@ class MovieService
             $movies = Movie::search($db, $query, $bot->userId());
             if (empty($movies)) {
                 $bot->sendMessage(
-                    text: "🔍 <b>Qidiruv natijalari:</b>\n\n" .
-                        "❌ <b>\"{$query}\"</b> bo'yicha hech narsa topilmadi.",
+                    text: "😞 <b>\"{$query}\"</b> bo'yicha hech narsa topilmadi.",
                     parse_mode: ParseMode::HTML,
                     reply_markup: Keyboard::MainMenu($bot)
                 );
@@ -47,10 +44,8 @@ class MovieService
                 return;
             }
 
-            // Multiple results
             $message = "🔍 <b>Qidiruv natijalari:</b> \"{$query}\"\n\n";
-            $message .= "Topildi: " . count($movies) . " ta kino\n";
-            $message .= "Kerakli kinoni tanlang:";
+            $message .= "✅ <b>Topildi:</b> " . count($movies) . " ta kino.\n";
 
             $bot->sendMessage(
                 text: $message,
@@ -75,26 +70,16 @@ class MovieService
                 }
             }
 
-            // Increment view count
             Movie::addView($db, $bot->userId(), $movie['id']);
 
-            // Get videos for this movie
             $videos = Video::getAllByMovie($db, $movie['id']);
-
-            // Create movie info text
-            $text = Text::MovieInfo($movie, Validator::isAdmin($bot));
-
-            // Add video count info
             $videoCount = count($videos);
-            $text .= "\n📹 <b>Video qismlar:</b> " . $videoCount . " ta\n";
 
-            // Add views and likes info
-            $text .= "👁 <b>Ko'rishlar:</b> " . Formatter::formatNumber($movie['views']) . "\n";
-            $text .= "❤️ <b>Yoqtirishlar:</b> " . Formatter::formatNumber($movie['likes']) . "\n";
+            $text = Text::MovieInfo($movie, $videoCount, Validator::isAdmin($bot));
 
-            if ($movie['photo_file_id']) {
+            if ($movie['file_id']) {
                 $bot->sendPhoto(
-                    photo: $movie['photo_file_id'],
+                    photo: $movie['file_id'],
                     caption: $text,
                     parse_mode: ParseMode::HTML,
                     reply_markup: Keyboard::MovieActions($movie, ['video_count' => $videoCount, 'is_liked' => $movie['is_liked'] ?? false], Validator::isAdmin($bot))
@@ -119,7 +104,6 @@ class MovieService
         try {
             $userId = $bot->userId();
 
-            // Get user's liked movies
             $stmt = $db->prepare("
                 SELECT m.* 
                 FROM movies m
@@ -127,13 +111,13 @@ class MovieService
                 WHERE ul.user_id = ?
                 ORDER BY ul.liked_at DESC
             ");
+
             $stmt->execute([$userId]);
             $likedMovies = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             if (empty($likedMovies)) {
                 $bot->sendMessage(
-                    text: "❤️ <b>Sevimli kinolar</b>\n\n" .
-                        "Sizda hali sevimli kinolar yo'q.",
+                    text: "😞 <b>Sizda hali sevimli kinolar yo'q.</b>",
                     parse_mode: ParseMode::HTML,
                     reply_markup: Keyboard::MainMenu($bot)
                 );
@@ -142,9 +126,7 @@ class MovieService
 
             $message = "❤️ <b>Sevimli kinolar</b>\n\n";
             $message .= "Sevimli kinolaringiz soni: " . count($likedMovies) . " ta\n";
-            $message .= "Kerakli kinoni tanlang:";
 
-            // Create keyboard with movie list
             $keyboard = Keyboard::SearchResults($likedMovies);
 
             $bot->sendMessage(
@@ -169,8 +151,7 @@ class MovieService
 
             if (empty($trending)) {
                 $bot->sendMessage(
-                    text: "🔥 <b>Trend kinolar</b>\n\n" .
-                        "Hozircha trend kinolar yo'q.",
+                    text: "😞 <b>Hozircha trend kinolar yo'q.</b>",
                     parse_mode: ParseMode::HTML,
                     reply_markup: Keyboard::MainMenu($bot)
                 );
@@ -183,7 +164,6 @@ class MovieService
             $message = "🔥 <b>Trend kinolar</b> (sahifa 1/{$totalPages})\n\n";
             $message .= "Eng ko'p ko'rilgan va yoqtirilgan kinolar:";
 
-            // Create keyboard with trending movies and pagination
             $keyboard = Keyboard::Pagination('trending', 1, $totalPages, [
                 array_map(function ($movie) {
                     return Keyboard::getCallbackButton($movie['title'], "movie_{$movie['id']}");
@@ -233,8 +213,7 @@ class MovieService
 
             if (empty($videos)) {
                 $bot->sendMessage(
-                    text: "📹 <b>{$movie['title']}</b> videolari\n\n" .
-                        "Bu kino uchun videolar mavjud emas.",
+                    text: "😞 <b>Bu kino uchun videolar mavjud emas.</b>",
                     parse_mode: ParseMode::HTML,
                     reply_markup: Keyboard::MainMenu($bot)
                 );
@@ -270,18 +249,15 @@ class MovieService
                 return;
             }
 
-            // Send video
             $bot->sendVideo(
-                video: $video['video_file_id'],
+                video: $video['file_id'],
                 caption: "{$video['movie_title']} - {$video['title']} ({$video['part_number']}-qism)",
                 parse_mode: ParseMode::HTML,
                 supports_streaming: true
             );
 
-            // Update view count for the movie
             Movie::addView($db, $bot->userId(), $video['movie_id']);
 
-            // Get next video if exists
             $nextVideo = Video::findByPart($db, $video['movie_id'], $video['part_number'] + 1);
 
             if ($nextVideo) {
@@ -290,7 +266,7 @@ class MovieService
                     parse_mode: ParseMode::HTML,
                     reply_markup: InlineKeyboardMarkup::make()
                         ->addRow(
-                            InlineKeyboardButton::make("▶️ Keyingi qismni ko'rish", callback_data: "play_video_{$nextVideo['id']}")
+                            InlineKeyboardButton::make(text: "▶️ Keyingi qismni ko'rish", callback_data: "play_video_{$nextVideo['id']}")
                         )
                 );
             }

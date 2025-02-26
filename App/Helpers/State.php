@@ -17,7 +17,7 @@ class State
         return $state;
     }
 
-    public static function setState(Nutgram $bot, string $key, string | null $value): void
+    public static function setState(Nutgram $bot, string $key, $value): void
     {
         $bot->setUserData($key, $value);
     }

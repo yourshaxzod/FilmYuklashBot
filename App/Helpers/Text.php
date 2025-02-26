@@ -27,7 +27,7 @@ class Text
 
     public static function SearchMenu(): string
     {
-        return "🔍 <b>Iltimos, qidirmoqchi bo'lgan kino nomini yoki kodini kiriting:</b>";
+        return "🔍 <b>Iltimos, qidirmoqchi bo'lgan kino nomini yoki id raqamini kiriting:</b>";
     }
 
     public static function MovieManage(): string
@@ -91,24 +91,55 @@ class Text
             "🚫 Bekor qilish uchun \"Bekor qilish\" tugmasini bosing";
     }
 
-    public static function MovieInfo(array $movie, bool $isAdmin = false): string
+    public static function MovieInfo(array $movie, int $videoCount, bool $isAdmin = false): string
     {
-        $text = "";
-        $text .= "🆔 <b>ID:</b> {$movie['id']}\n";
-        $text .= "🎬 <b>Nomi:</b> {$movie['title']}\n";
-        $text .= "📝 <b>Tavsif:</b> {$movie['description']}\n";
+        $text = "🆔 <b>ID:</b> {$movie['id']}\n";
         $text .= "📅 <b>Yil:</b> {$movie['year']}\n";
+        $text .= "🎬 <b>Nomi:</b> {$movie['title']}\n";
+        $text .= "📹 <b>Qismlar:</b> " . $videoCount . " ta\n\n";
+        $text .= "📝 <b>Tavsif:</b> {$movie['description']}\n";
 
         return $text;
     }
 
     public static function VideoInfo(array $video, bool $isAdmin = false): string
     {
-        $text = "";
-        $text .= "🎬 <b>Nomi:</b> {$video['title']}\n\n";
+        $text = "🎬 <b>Nomi:</b> {$video['title']}\n\n";
         $text .= "🔢 <b>Kod:</b> {$video['code']}\n";
 
         $text .= "\n📝 <b>Tavsif:</b>\n{$video['description']}\n\n";
+
+        return $text;
+    }
+
+    public static function statisticsInfo(array $stats): string
+    {
+        $text = "📊 <b>Bot Statistikasi</b>\n\n";
+
+        $text .= "🎬 <b>Kinolar:</b> " . Formatter::formatNumber($stats['movies']) . "\n";
+        $text .= "📹 <b>Videolar:</b> " . Formatter::formatNumber($stats['videos']) . "\n";
+        $text .= "👤 <b>Foydalanuvchilar:</b> " . Formatter::formatNumber($stats['users']) . "\n";
+        $text .= "👁 <b>Ko'rishlar:</b> " . Formatter::formatNumber($stats['views']) . "\n";
+        $text .= "❤️ <b>Yoqtirishlar:</b> " . Formatter::formatNumber($stats['likes']) . "\n\n";
+
+        $text .= "📅 <b>Bugun:</b>\n";
+        $text .= " - 👤 Yangi foydalanuvchilar: " . Formatter::formatNumber($stats['today']['new_users']) . "\n";
+        $text .= " - 👁 Ko'rishlar: " . Formatter::formatNumber($stats['today']['views']) . "\n";
+        $text .= " - ❤️ Yoqtirishlar: " . Formatter::formatNumber($stats['today']['likes']) . "\n\n";
+
+        $text .= "📆 <b>So'nggi 7 kun:</b>\n";
+        $text .= " - 👤 Yangi foydalanuvchilar: " . Formatter::formatNumber($stats['week']['new_users']) . "\n";
+        $text .= " - 👁 Ko'rishlar: " . Formatter::formatNumber($stats['week']['views']) . "\n";
+        $text .= " - ❤️ Yoqtirishlar: " . Formatter::formatNumber($stats['week']['likes']) . "\n\n";
+
+        if (isset($stats['top_movie']) && $stats['top_movie']) {
+            $text .= "🔝 <b>Eng mashhur kino:</b>\n";
+            $text .= " - 🎬 " . $stats['top_movie']['title'] . "\n";
+            $text .= " - 👁 Ko'rishlar: " . Formatter::formatNumber($stats['top_movie']['views']) . "\n";
+            $text .= " - ❤️ Yoqtirishlar: " . Formatter::formatNumber($stats['top_movie']['likes']) . "\n\n";
+        }
+
+        $text .= "⏱ <i>So'nggi yangilanish: " . date('d.m.Y H:i:s') . "</i>";
 
         return $text;
     }

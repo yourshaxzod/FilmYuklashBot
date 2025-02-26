@@ -56,13 +56,11 @@ class MediaHandler
         State::setState($bot, 'state', 'add_movie_confirm');
 
         $title = $bot->getUserData('movie_title');
-        $code = $bot->getUserData('movie_code');
         $description = $bot->getUserData('movie_description');
-        $year = $bot->getUserData('movie_year', date('Y'));
+        $year = $bot->getUserData('movie_year');
 
         $message = "🎬 <b>Yangi kino ma'lumotlari:</b>\n\n";
         $message .= "📋 <b>Nomi:</b> {$title}\n";
-        $message .= "🔢 <b>Kod:</b> {$code}\n";
         $message .= "📅 <b>Yil:</b> {$year}\n";
         $message .= "📝 <b>Tavsif:</b> {$description}\n\n";
         $message .= "Kino qo'shishni tasdiqlaysizmi?";
@@ -87,7 +85,7 @@ class MediaHandler
         $fileId = end($photo)->file_id;
 
         try {
-            Movie::update($db, $movieId, ['photo_file_id' => $fileId]);
+            Movie::update($db, $movieId, ['file_id' => $fileId]);
 
             $bot->sendPhoto(
                 photo: $fileId,
@@ -128,9 +126,7 @@ class MediaHandler
 
         if (empty($title)) {
             State::setState($bot, 'state', 'add_video_title');
-            State::setState($bot, 'video_file_id', $video->file_id);
-            State::setState($bot, 'video_duration', $video->duration);
-            State::setState($bot, 'video_file_size', $video->file_size);
+            State::setState($bot, 'file_id', $video->file_id);
 
             $bot->sendMessage(
                 text: "🎬 Video qabul qilindi!\n\nEndi, iltimos, video sarlavhasini kiriting:",
@@ -144,7 +140,7 @@ class MediaHandler
                 'movie_id' => $movieId,
                 'title' => $title,
                 'part_number' => $partNumber,
-                'video_file_id' => $video->file_id,
+                'file_id' => $video->file_id,
                 'duration' => $video->duration,
                 'file_size' => $video->file_size
             ];
@@ -186,7 +182,7 @@ class MediaHandler
 
         try {
             Video::update($db, $videoId, [
-                'video_file_id' => $uploadedVideo->file_id,
+                'file_id' => $uploadedVideo->file_id,
                 'duration' => $uploadedVideo->duration,
                 'file_size' => $uploadedVideo->file_size
             ]);
@@ -204,6 +200,7 @@ class MediaHandler
                 parse_mode: 'HTML',
                 reply_markup: Keyboard::MainMenu($bot)
             );
+
 
             State::clearState($bot);
         } catch (\Exception $e) {

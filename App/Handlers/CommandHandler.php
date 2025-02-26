@@ -176,14 +176,11 @@ class CommandHandler
             }
 
             $stmt = $db->prepare("
-                INSERT INTO users (user_id, username, first_name, last_name, status, created_at) 
-                VALUES (?, ?, ?, ?, 'active', NOW())
+                INSERT INTO users (user_id, status, created_at) 
+                VALUES (?, 'active', NOW())
             ");
             $stmt->execute([
                 $userId,
-                $user->username ?? null,
-                $user->first_name ?? null,
-                $user->last_name ?? null
             ]);
         } catch (\Exception $e) {
             if (class_exists('App\Helpers\Config') && method_exists('App\Helpers\Config', 'isDebugMode') && \App\Helpers\Config::isDebugMode()) {

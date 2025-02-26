@@ -108,9 +108,8 @@ class Movie
                 LEFT JOIN movie_videos mv ON m.id = mv.movie_id
                 LEFT JOIN user_likes ul ON m.id = ul.movie_id AND ul.user_id = :user_id
                 WHERE LOWER(m.title) LIKE LOWER(:query) 
-                   OR LOWER(m.code) LIKE LOWER(:query)
-                GROUP BY m.id, m.title, m.code, m.description, m.photo_file_id,
-                         m.views, m.like_count, m.created_at, ul.id
+                GROUP BY m.id, m.title, m.description, m.file_id,
+                         m.views, m.likes, m.created_at, ul.id
                 ORDER BY m.title ASC
                 LIMIT :limit";
 
@@ -127,7 +126,7 @@ class Movie
             return array_map(function ($movie) {
                 $movie['video_count'] = (int)$movie['video_count'];
                 $movie['views'] = (int)$movie['views'];
-                $movie['like_count'] = (int)$movie['like_count'];
+                $movie['likes'] = (int)$movie['likes'];
                 $movie['is_liked'] = (bool)$movie['is_liked'];
                 return $movie;
             }, $results);
@@ -156,7 +155,7 @@ class Movie
                    CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked
                    FROM movies m 
                    LEFT JOIN user_likes ul ON m.id = ul.movie_id AND ul.user_id = :user_id
-                   ORDER BY m.views DESC, m.like_count DESC
+                   ORDER BY m.views DESC, m.likes DESC
                    LIMIT :limit";
 
             $stmt = $db->prepare($sql);
@@ -178,7 +177,6 @@ class Movie
                     g.name as genre_name,
                     (SELECT COUNT(*) FROM videos WHERE movie_id = m.id) as videos_count
                 FROM movies m
-                LEFT JOIN genres g ON m.genre_id = g.id
                 INNER JOIN movie_likes ml ON m.id = ml.movie_id 
                 WHERE ml.user_id = ?
                 ORDER BY ml.created_at DESC";
@@ -205,20 +203,15 @@ class Movie
         try {
             $db->beginTransaction();
 
-            if (self::findByCode($db, $data['code'])) {
-                throw new Exception("Bu kod bilan kino allaqachon mavjud");
-            }
-
-            $sql = "INSERT INTO movies (title, code, description, year, photo_file_id, created_at)
-                    VALUES (:title, :code, :description, :year, :photo_file_id, NOW())";
+            $sql = "INSERT INTO movies (title, description, year, file_id, created_at)
+                    VALUES (:title, :description, :year, :file_id, NOW())";
 
             $stmt = $db->prepare($sql);
             $stmt->execute([
                 'title' => $data['title'],
-                'code' => $data['code'],
                 'description' => $data['description'],
                 'year' => $data['year'],
-                'photo_file_id' => $data['photo_file_id']
+                'file_id' => $data['file_id']
             ]);
 
             $movieId = $db->lastInsertId();
@@ -235,13 +228,6 @@ class Movie
     {
         try {
             $db->beginTransaction();
-
-            if (isset($data['code'])) {
-                $existing = self::findByCode($db, $data['code']);
-                if ($existing && $existing['id'] !== $id) {
-                    throw new Exception("Bu kod bilan boshqa kino mavjud");
-                }
-            }
 
             $fields = [];
             $values = [];
@@ -307,7 +293,7 @@ class Movie
                 $stmt = $db->prepare("DELETE FROM user_likes WHERE user_id = ? AND movie_id = ?");
                 $stmt->execute([$userId, $movieId]);
 
-                $stmt = $db->prepare("UPDATE movies SET like_count = like_count - 1 WHERE id = ?");
+                $stmt = $db->prepare("UPDATE movies SET likes = likes - 1 WHERE id = ?");
                 $stmt->execute([$movieId]);
 
                 $db->commit();
@@ -316,7 +302,7 @@ class Movie
                 $stmt = $db->prepare("INSERT INTO user_likes (user_id, movie_id, liked_at) VALUES (?, ?, NOW())");
                 $stmt->execute([$userId, $movieId]);
 
-                $stmt = $db->prepare("UPDATE movies SET like_count = like_count + 1 WHERE id = ?");
+                $stmt = $db->prepare("UPDATE movies SET likes = likes + 1 WHERE id = ?");
                 $stmt->execute([$movieId]);
 
                 $db->commit();

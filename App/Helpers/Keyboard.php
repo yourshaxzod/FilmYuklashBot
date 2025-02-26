@@ -100,7 +100,7 @@ class Keyboard
         if (($video['video_count'] ?? 0) > 0) {
             $keyboard->addRow(
                 InlineKeyboardButton::make(
-                    text: '▶️ Ko\'rish',
+                    text: "▶️ Tomosha qilish",
                     callback_data: "watch_movie_{$movie['id']}"
                 )
             );
@@ -115,6 +115,10 @@ class Keyboard
             InlineKeyboardButton::make(
                 text: $likeText,
                 callback_data: "like_movie_{$movie['id']}"
+            ),
+            InlineKeyboardButton::make(
+                text: "↪️",
+                switch_inline_query: "test"
             )
         );
 
@@ -194,18 +198,11 @@ class Keyboard
         foreach ($videos as $video) {
             $keyboard->addRow(
                 InlineKeyboardButton::make(
-                    text: "📹 {$video['part_number']}-qism - {$video['title']}",
+                    text: "📹 {$video['part_number']}-qism",
                     callback_data: "play_video_{$video['id']}"
                 )
             );
         }
-
-        $keyboard->addRow(
-            InlineKeyboardButton::make(
-                text: '🔙 Orqaga',
-                callback_data: "movie_{$movieId}"
-            )
-        );
 
         return $keyboard;
     }
@@ -305,6 +302,17 @@ class Keyboard
         }
 
         return $keyboard;
+    }
+
+    public static function statisticsActions(): InlineKeyboardMarkup
+    {
+        return InlineKeyboardMarkup::make()
+            ->addRow(
+                InlineKeyboardButton::make(
+                    text: "🔄 Yangilash",
+                    callback_data: "refresh_stats"
+                )
+            );
     }
 
     public static function getUrlButton(string $text, string $url): InlineKeyboardButton
