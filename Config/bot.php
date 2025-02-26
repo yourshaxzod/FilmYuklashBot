@@ -20,13 +20,6 @@ function createBot(): Nutgram
 
         $bot->setRunningMode(Polling::class);
 
-        $bot->setMyCommands([
-            ['command' => 'start', 'description' => '🔄 Botni qayta ishga tushirish.'],
-            ['command' => 'search', 'description' => '🔍 Qidirish.'],
-            ['command' => 'favorites', 'description' => '❤️ Sevimlilar'],
-            ['command' => 'trending', 'description' => '🔥 Trendlar']
-        ]);
-
         return $bot;
     } catch (\Throwable $e) {
         throw new \Exception('Botni yaratishda xatolik:: ' . $e->getMessage());

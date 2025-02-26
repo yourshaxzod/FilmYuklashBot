@@ -307,12 +307,12 @@ class Keyboard
         return $keyboard;
     }
 
-    private static function getUrlButton(string $text, string $url): InlineKeyboardButton
+    public static function getUrlButton(string $text, string $url): InlineKeyboardButton
     {
         return InlineKeyboardButton::make(text: $text, url: $url);
     }
 
-    private static function getCallbackButton(string $text, string $callbackData): InlineKeyboardButton
+    public static function getCallbackButton(string $text, string $callbackData): InlineKeyboardButton
     {
         return InlineKeyboardButton::make(text: $text, callback_data: $callbackData);
     }

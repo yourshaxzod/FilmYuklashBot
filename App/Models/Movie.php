@@ -236,7 +236,6 @@ class Movie
         try {
             $db->beginTransaction();
 
-            // Check if code exists for another movie
             if (isset($data['code'])) {
                 $existing = self::findByCode($db, $data['code']);
                 if ($existing && $existing['id'] !== $id) {

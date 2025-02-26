@@ -40,5 +40,5 @@ try {
         error_log("Stack trace: " . $e->getTraceAsString());
     }
 
-    die("Botni ishga tushirishda xatolik.");
+    die("Botni ishga tushirishda xatolik." . $e);
 }
