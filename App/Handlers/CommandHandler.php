@@ -3,43 +3,45 @@
 namespace App\Handlers;
 
 use SergiX44\Nutgram\Nutgram;
-use App\Services\{MovieService, ChannelService};
-use App\Helpers\{Keyboard, Validator};
+use App\Services\{MovieService};
+use App\Helpers\{Menu, State};
 use PDO;
 
 class CommandHandler
 {
     public static function register(Nutgram $bot, PDO $db): void
     {
-        // Start command
+        $bot->onCommand('.*', function (Nutgram $bot) {
+            State::clearState($bot);
+        });
+
         $bot->onCommand('start', function (Nutgram $bot) use ($db) {
-            $bot->setUserData('state', null);
-            $bot->setUserData('movie_data', null);
-            $bot->setUserData('video_data', null);
-            Keyboard::showMainMenu($bot);
+            Menu::showMainMenu($bot);
         });
 
-        // Menu commands
-        $bot->onText('🔍 Kino qidirish', function (Nutgram $bot) {
-            MovieService::startSearch($bot);
+        self::registerMenuButtons($bot, $db);
+        self::registerAdminButtons($bot);
+    }
+
+    private static function registerMenuButtons(Nutgram $bot, PDO $db): void
+    {
+        $bot->onText('🔍 Qidirish', function (Nutgram $bot) use ($db) {
+            Menu::showSearchMenu($bot);
         });
 
-        $bot->onText('🏆 TOP', function (Nutgram $bot) use ($db) {
-            MovieService::showTop($bot, $db);
+        $bot->onText('❤️ Sevimlilar', function (Nutgram $bot) use ($db) {
+            MovieService::showFavorites($bot, $db);
         });
 
-        // Admin commands
-        $bot->onText('🎛 Admin panel', function (Nutgram $bot) {
-            if (!Validator::isAdmin($bot)) return;
-            Keyboard::showAdminMenu($bot);
+        $bot->onText('🔥 Trendlar', function (Nutgram $bot) use ($db) {
+            MovieService::showTrending($bot, $db);
         });
+    }
 
-        // Kinolar menu commands
-        $bot->onText('🎬 Kinolar', function (Nutgram $bot) {
-            if (!Validator::isAdmin($bot)) return;
-            Keyboard::showManageMovieMenu($bot);
+    private static function registerAdminButtons(Nutgram $bot): void
+    {
+        $bot->onText("🛠 Statistika va Boshqaruv", function (Nutgram $bot) {
+            Menu::showAdminMenu($bot);
         });
-
-        // ...and other command handlers
     }
 }

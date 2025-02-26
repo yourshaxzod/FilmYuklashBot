@@ -1,15 +1,34 @@
 <?php
 
+declare(strict_types=1);
+
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\RunningMode\Polling;
+use App\Helpers\Config;
 
 function createBot(): Nutgram
 {
-    $dotenv = Dotenv\Dotenv::createImmutable('../');
-    $dotenv->load();
+    try {
+        Config::load();
 
-    $bot = new Nutgram($_ENV['BOT_TOKEN']);
-    $bot->setRunningMode(Polling::class);
+        $token = Config::get('BOT_TOKEN');
+        if (empty($token)) {
+            throw new \Exception('Bot token kiritilmagan!');
+        }
 
-    return $bot;
+        $bot = new Nutgram($token);
+
+        $bot->setRunningMode(Polling::class);
+
+        $bot->setMyCommands([
+            ['command' => 'start', 'description' => '🔄 Botni qayta ishga tushirish.'],
+            ['command' => 'search', 'description' => '🔍 Qidirish.'],
+            ['command' => 'favorites', 'description' => '❤️ Sevimlilar'],
+            ['command' => 'trending', 'description' => '🔥 Trendlar']
+        ]);
+
+        return $bot;
+    } catch (\Throwable $e) {
+        throw new \Exception('Botni yaratishda xatolik:: ' . $e->getMessage());
+    }
 }

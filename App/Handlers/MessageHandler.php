@@ -3,8 +3,8 @@
 namespace App\Handlers;
 
 use SergiX44\Nutgram\Nutgram;
-use App\Services\{MovieService, ChannelService, VideoService};
-use App\Helpers\Validator;
+use App\Services\{MovieService};
+use App\Helpers\{Menu, State};
 use PDO;
 
 class MessageHandler
@@ -12,30 +12,46 @@ class MessageHandler
     public static function register(Nutgram $bot, PDO $db): void
     {
         $bot->onMessage(function (Nutgram $bot) use ($db) {
-            $message = $bot->message()->text;
-            $state = $bot->getUserData('state');
+            $message = $bot->message();
 
-            // Handle cancellation
-            if ($message === "🚫 Bekor qilish" || $message === "◀️ Kino panelga qaytish") {
-                StateHandler::handleCancel($bot);
+            if (!$message->text) {
                 return;
             }
 
-            // Handle states
-            switch ($state) {
-                case 'search_movie':
-                    MovieService::search($bot, $db, $message);
-                    break;
-                case 'add_movie_name':
-                    if (!Validator::isAdmin($bot)) return;
-                    MovieService::handleAddName($bot, $message);
-                    break;
-                case 'add_movie_code':
-                    if (!Validator::isAdmin($bot)) return;
-                    MovieService::handleAddCode($bot, $message);
-                    break;
-                    // ... other state handlers
+            $state = State::getState($bot);
+            if (!$state) {
+                return;
+            }
+
+            if (self::handleMovieStates($bot, $db, $state, $message->text)) {
+                return;
             }
         });
+    }
+
+
+    
+
+    private static function handleMovieStates(Nutgram $bot, PDO $db, string $state, string $text): bool
+    {
+        switch ($state) {
+            case 'search':
+                if ($text === "↩️ Ortga qaytish") {
+                    State::clearState($bot);
+                    Menu::showMainMenu($bot);
+                    break;
+                }
+                MovieService::search($bot, $db, $text);
+                break;
+            case 'panel':
+                if ($text === "↩️ Ortga qaytish") {
+                    State::clearState($bot);
+                    Menu::showMainMenu($bot);
+                    break;
+                }
+                break;
+        }
+
+        return false;
     }
 }

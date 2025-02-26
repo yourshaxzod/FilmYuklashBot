@@ -4,53 +4,92 @@ namespace App\Helpers;
 
 class Formatter
 {
-    public static function movieInfo(array $movie): string
+    public static function errorMessage(string $error): string
     {
-        return "🎬 <b>Nomi:</b> {$movie['title']}\n" .
-            "📝 <b>Tavsif:</b> {$movie['description']}\n" .
-            "🔢 <b>Kod:</b> {$movie['code']}\n" .
-            "👁 <b>Ko'rildi:</b> {$movie['views']} marta";
+        return "🚫: {$error}";
     }
 
-    public static function searchPrompt(): string
+    public static function successMessage(string $message): string
     {
-        return "🔍 <b>Iltimos, qidirmoqchi bo'lgan kino nomini yoki kodini kiriting:</b>";
+        return "✅: {$message}";
     }
 
-    public static function movieNotFound(): string
+    public static function formatFileSize(int $bytes): string
     {
-        return "⚠️ Afsuski, siz qidirgan kino topilmadi.";
+        $units = ['B', 'KB', 'MB', 'GB'];
+        $bytes = max($bytes, 0);
+        $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
+        $pow = min($pow, count($units) - 1);
+        $bytes /= pow(1024, $pow);
+
+        return round($bytes, 2) . ' ' . $units[$pow];
     }
 
-    public static function videoAddSuccess(array $videoData): string
+    public static function formatNumber($number)
     {
-        return "✅ Video muvaffaqiyatli qo'shildi!\n\n" .
-            "Kino: {$videoData['movie_title']}\n" .
-            "Video: {$videoData['title']}\n" .
-            "Qism: {$videoData['part_number']}";
-    }
-
-    public static function channelList(array $channels): string
-    {
-        $message = "📢 Kanallar ro'yxati:\n\n";
-        foreach ($channels as $channel) {
-            $message .= "@{$channel['username']}\n";
+        if ($number < 1000) {
+            return number_format($number);
+        } elseif ($number < 1000000) {
+            $formatted = $number / 1000;
+            return round($formatted, 1) . 'K';
+        } elseif ($number < 1000000000) {
+            $formatted = $number / 1000000;
+            return round($formatted, 1) . 'M';
+        } else {
+            $formatted = $number / 1000000000;
+            return round($formatted, 1) . 'B';
         }
-        return $message;
     }
 
-    public static function statisticsInfo(array $data): string
+    public static function formatDuration(int $seconds): string
     {
-        $message = "📊 Bot statistikasi:\n\n" .
-            "🎬 Kinolar soni: {$data['movies']}\n" .
-            "📹 Video qismlar soni: {$data['videos']}\n" .
-            "📢 Kanallar soni: {$data['channels']}\n";
+        $hours = floor($seconds / 3600);
+        $minutes = floor(($seconds % 3600) / 60);
+        $seconds = $seconds % 60;
 
-        if ($data['top_movie']) {
-            $message .= "\n🏆 <b>Eng ko'p ko'rilgan kino:</b>\n" .
-                "• {$data['top_movie']['title']} ({$data['top_movie']['views']} marta)";
+        $parts = [];
+        if ($hours > 0) {
+            $parts[] = "{$hours}s";
+        }
+        if ($minutes > 0) {
+            $parts[] = "{$minutes}m";
+        }
+        if ($seconds > 0 || empty($parts)) {
+            $parts[] = "{$seconds}s";
         }
 
-        return $message;
+        return implode(' ', $parts);
+    }
+
+    public static function formatDate(string $date): string
+    {
+        return date('d.m.Y', strtotime($date));
+    }
+
+    public static function formatDateTime(string $datetime): string
+    {
+        return date('d.m.Y H:i', strtotime($datetime));
+    }
+
+    public static function truncateText(string $text, int $length): string
+    {
+        if (mb_strlen($text) <= $length) {
+            return $text;
+        }
+
+        return mb_substr($text, 0, $length) . '...';
+    }
+
+    public static function isNumericString($str)
+    {
+        return ctype_digit($str);
+    }
+
+    public static function stringToInteger($str)
+    {
+        if (self::isNumericString($str)) {
+            return intval($str);
+        }
+        return false;
     }
 }

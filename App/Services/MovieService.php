@@ -3,52 +3,84 @@
 namespace App\Services;
 
 use SergiX44\Nutgram\Nutgram;
-use App\Models\Movie;
-use App\Helpers\{Formatter, Keyboard};
-use PDO;
 use SergiX44\Nutgram\Telegram\Properties\ParseMode;
+use App\Models\{Movie, Video};
+use App\Helpers\{Formatter, Keyboard, StateHandler, Validator, Menu, State, Text};
+use PDO;
 
-class MovieService {
-    public static function startSearch(Nutgram $bot): void {
-        $bot->sendMessage(
-            text: Formatter::searchPrompt(),
-            parse_mode: ParseMode::HTML,
-            reply_markup: Keyboard::searchCancelButton()
-        );
-        $bot->setUserData('state', 'search_movie');
-    }
+class MovieService
+{
+    public static function search(Nutgram $bot, PDO $db, string $query): void
+    {
+        try {
+            $query = trim($query);
 
-    public static function search(Nutgram $bot, PDO $db, string $query): void {
-        $movie = Movie::findByCode($db, $query);
-        if ($movie) {
-            self::showMovie($bot, $db, $movie);
-            Movie::incrementViews($db, $movie['id']);
-            return;
-        }
-
-        $movies = Movie::searchByTitle($db, $query);
-        if (!empty($movies)) {
-            if (count($movies) === 1) {
-                self::showMovie($bot, $db, $movies[0]);
-                Movie::incrementViews($db, $movies[0]['id']);
-            } else {
-                self::showSearchResults($bot, $movies);
+            if (Formatter::isNumericString($query)) {
+                $movie = Movie::findByCode($db, Formatter::stringToInteger($query), $bot->userId());
+                if ($movie) {
+                    self::show($bot, $db, $movie);
+                    return;
+                }
             }
-        } else {
-            $bot->sendMessage(text: Formatter::movieNotFound());
+
+            $movies = Movie::search($db, $query, $bot->userId());
+            if (empty($movies)) {
+                $bot->sendMessage(
+                    text: "Topilmadi",
+                    reply_markup: Keyboard::MainMenu($bot)
+                );
+                State::clearState($bot);
+                return;
+            }
+
+            if (count($movies) === 1) {
+                self::show($bot, $db, $movies[0]);
+                return;
+            }
+
+            $bot->sendMessage(
+                text: "topildi",
+                parse_mode: ParseMode::HTML,
+                reply_markup: Keyboard::searchResults($movies)
+            );
+        } catch (\Exception $e) {
+            $bot->sendMessage(
+                text: "⚠️ Qidirishda xatolik yuz berdi: " . $e->getMessage(),
+                reply_markup: Keyboard::MainMenu($bot)
+            );
         }
     }
 
-    public static function showMovie(Nutgram $bot, PDO $db, array $movie): void {
-        $videoCount = Movie::getVideoCount($db, $movie['id']);
-        
-        $bot->sendPhoto(
-            photo: $movie['photo_file_id'],
-            caption: Formatter::movieInfo($movie),
-            parse_mode: ParseMode::HTML,
-            reply_markup: Keyboard::movieActions($movie['id'], $videoCount)
-        );
-    }
+    public static function show(Nutgram $bot, PDO $db, array|int $movie): void
+    {
+        try {
+            if (is_int($movie)) {
+                $movie = Movie::find($db, $movie, $bot->userId());
+                if (!$movie) {
+                    throw new \Exception("Kino topilmadi.");
+                }
+            }
 
-    // ...other movie related methods
+            Movie::addView($db, $bot->userId(), $movie['id']);
+
+            $videos = Video::getAllByMovie($db, $movie['id']);
+
+            if ($movie['photo_file_id']) {
+                $bot->sendPhoto(
+                    photo: $movie['photo_file_id'],
+                    caption: Text::MovieInfo($movie, Validator::isAdmin($bot)),
+                    parse_mode: ParseMode::HTML,
+                    reply_markup: Keyboard::movieActions($movie, $videos, Validator::isAdmin($bot))
+                );
+            } else {
+                $bot->sendMessage(
+                    text: Text::MovieInfo($movie, Validator::isAdmin($bot)),
+                    parse_mode: ParseMode::HTML,
+                    reply_markup: Keyboard::movieActions($movie['id'], $movie, Validator::isAdmin($bot))
+                );
+            }
+        } catch (\Exception $e) {
+            $bot->sendMessage(text: "⚠️ Xatolik: " . $e->getMessage());
+        }
+    }
 }
