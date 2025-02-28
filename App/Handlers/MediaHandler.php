@@ -4,11 +4,17 @@ namespace App\Handlers;
 
 use SergiX44\Nutgram\Nutgram;
 use App\Models\{Movie, Video};
-use App\Helpers\{Menu, State, Validator, Formatter, Keyboard};
+use App\Services\VideoService;
+use App\Helpers\{State, Formatter, Keyboard, Text};
 use PDO;
 
 class MediaHandler
 {
+    /**
+     * Barcha media handlerlari ro'yxatga olish.
+     * @param Nutgram $bot Telegram bot.
+     * @param PDO $db Database ulanish.
+     */
     public static function register(Nutgram $bot, PDO $db): void
     {
         $bot->onPhoto(function (Nutgram $bot) use ($db) {
@@ -24,8 +30,6 @@ class MediaHandler
                 self::handleMoviePosterEdit($bot, $db, $movieId);
                 return;
             }
-
-            $bot->sendMessage("Rasm qabul qilindi, lekin hozir bu kerak emas.");
         });
 
         $bot->onVideo(function (Nutgram $bot) use ($db) {
@@ -33,7 +37,7 @@ class MediaHandler
             $movieId = $bot->getUserData('movie_id');
 
             if ($state === 'add_video' && $movieId) {
-                self::handleVideoUpload($bot, $db, (int)$movieId);
+                VideoService::processUploadedVideo($bot, $db);
                 return;
             }
 
@@ -42,11 +46,14 @@ class MediaHandler
                 self::handleVideoEdit($bot, $db, (int)$movieId, $videoId);
                 return;
             }
-
-            $bot->sendMessage("Video qabul qilindi, lekin hozir bu kerak emas.");
         });
     }
 
+    /**
+     * Kino posteri yuklashni qayta ishlash.
+     * @param Nutgram $bot Telegram bot.
+     * @param PDO $db Database ulanish.
+     */
     private static function handleMoviePosterUpload(Nutgram $bot, PDO $db): void
     {
         $photo = $bot->message()->photo;
@@ -73,18 +80,24 @@ class MediaHandler
         );
     }
 
+    /**
+     * Kino posterini tahrirlashni qayta ishlash.
+     * @param Nutgram $bot Telegram bot.
+     * @param PDO $db Database ulanish.
+     * @param int $movieId Kino ID.
+     */
     private static function handleMoviePosterEdit(Nutgram $bot, PDO $db, int $movieId): void
     {
-        $movie = Movie::find($db, $movieId);
-        if (!$movie) {
-            $bot->sendMessage("Kino topilmadi!");
-            return;
-        }
-
-        $photo = $bot->message()->photo;
-        $fileId = end($photo)->file_id;
-
         try {
+            $movie = Movie::findByID($db, $movieId);
+            if (!$movie) {
+                $bot->sendMessage(text: Text::MovieNotFound());
+                return;
+            }
+
+            $photo = $bot->message()->photo;
+            $fileId = end($photo)->file_id;
+
             Movie::update($db, $movieId, ['file_id' => $fileId]);
 
             $bot->sendPhoto(
@@ -96,116 +109,63 @@ class MediaHandler
             State::clearState($bot);
         } catch (\Exception $e) {
             $bot->sendMessage(
-                text: "⚠️ Xatolik yuz berdi: " . $e->getMessage(),
+                text: Text::Error("Kino posterini yangilashda xatolik: ", $e->getMessage()),
                 reply_markup: Keyboard::MainMenu($bot)
             );
             State::clearState($bot);
         }
     }
 
-    private static function handleVideoUpload(Nutgram $bot, PDO $db, int $movieId): void
-    {
-        $movie = Movie::find($db, $movieId);
-        if (!$movie) {
-            $bot->sendMessage("Kino topilmadi!");
-            return;
-        }
-
-        $video = $bot->message()->video;
-
-        if ($video->file_size > 50 * 1024 * 1024) {
-            $bot->sendMessage(
-                text: "⚠️ Video hajmi 50MB dan oshmasligi kerak!",
-                reply_markup: Keyboard::Cancel()
-            );
-            return;
-        }
-
-        $title = $bot->getUserData('video_title');
-        $partNumber = (int)$bot->getUserData('video_part', Video::getNextPartNumber($db, $movieId));
-
-        if (empty($title)) {
-            State::setState($bot, 'state', 'add_video_title');
-            State::setState($bot, 'file_id', $video->file_id);
-
-            $bot->sendMessage(
-                text: "🎬 Video qabul qilindi!\n\nEndi, iltimos, video sarlavhasini kiriting:",
-                reply_markup: Keyboard::Cancel()
-            );
-            return;
-        }
-
-        try {
-            $videoData = [
-                'movie_id' => $movieId,
-                'title' => $title,
-                'part_number' => $partNumber,
-                'file_id' => $video->file_id,
-                'duration' => $video->duration,
-                'file_size' => $video->file_size
-            ];
-
-            $videoId = Video::create($db, $videoData);
-
-            $formattedSize = Formatter::formatFileSize($video->file_size);
-            $formattedDuration = Formatter::formatDuration($video->duration);
-
-            $bot->sendMessage(
-                text: "✅ Video muvaffaqiyatli qo'shildi!\n\n" .
-                    "🎬 <b>Kino:</b> {$movie['title']}\n" .
-                    "📹 <b>Video:</b> {$title}\n" .
-                    "🔢 <b>Qism:</b> {$partNumber}\n" .
-                    "⏱ <b>Davomiyligi:</b> {$formattedDuration}\n" .
-                    "📦 <b>Hajmi:</b> {$formattedSize}",
-                parse_mode: 'HTML',
-                reply_markup: Keyboard::MainMenu($bot)
-            );
-
-            State::clearState($bot);
-        } catch (\Exception $e) {
-            $bot->sendMessage(
-                text: "⚠️ Xatolik yuz berdi: " . $e->getMessage(),
-                reply_markup: Keyboard::Cancel()
-            );
-        }
-    }
-
+    /**
+     * Video tahrirlashni qayta ishlash.
+     * @param Nutgram $bot Telegram bot.
+     * @param PDO $db Database ulanish.
+     * @param int $movieId Kino ID.
+     * @param int $videoId Video ID.
+     */
     private static function handleVideoEdit(Nutgram $bot, PDO $db, int $movieId, int $videoId): void
     {
-        $video = Video::find($db, $videoId);
-        if (!$video || $video['movie_id'] != $movieId) {
-            $bot->sendMessage("Video topilmadi!");
-            return;
-        }
-
-        $uploadedVideo = $bot->message()->video;
-
         try {
+            $video = Video::findByID($db, $videoId);
+            if (!$video || $video['movie_id'] != $movieId) {
+                $bot->sendMessage(text: Text::VideoNotFound());
+                return;
+            }
+
+            $uploadedVideo = $bot->message()->video;
+
             Video::update($db, $videoId, [
-                'file_id' => $uploadedVideo->file_id,
-                'duration' => $uploadedVideo->duration,
-                'file_size' => $uploadedVideo->file_size
+                'file_id' => $uploadedVideo->file_id
             ]);
 
-            $formattedSize = Formatter::formatFileSize($uploadedVideo->file_size);
-            $formattedDuration = Formatter::formatDuration($uploadedVideo->duration);
+            $formattedSize = '';
+            $formattedDuration = '';
+
+            if (isset($uploadedVideo->file_size)) {
+                $formattedSize = "\n📦 <b>Hajmi:</b> " . Formatter::formatFileSize($uploadedVideo->file_size);
+            }
+
+            if (isset($uploadedVideo->duration)) {
+                $formattedDuration = "\n⏱ <b>Davomiyligi:</b> " . Formatter::formatDuration($uploadedVideo->duration);
+            }
+
+            $message = "✅ Video muvaffaqiyatli yangilandi!\n\n" .
+                "🎬 <b>Kino:</b> {$video['movie_title']}\n" .
+                "📹 <b>Video:</b> {$video['title']}\n" .
+                "🔢 <b>Qism:</b> {$video['id']}" .
+                $formattedDuration .
+                $formattedSize;
 
             $bot->sendMessage(
-                text: "✅ Video muvaffaqiyatli yangilandi!\n\n" .
-                    "🎬 <b>Kino:</b> {$video['movie_title']}\n" .
-                    "📹 <b>Video:</b> {$video['title']}\n" .
-                    "🔢 <b>Qism:</b> {$video['part_number']}\n" .
-                    "⏱ <b>Davomiyligi:</b> {$formattedDuration}\n" .
-                    "📦 <b>Hajmi:</b> {$formattedSize}",
+                text: $message,
                 parse_mode: 'HTML',
                 reply_markup: Keyboard::MainMenu($bot)
             );
 
-
             State::clearState($bot);
         } catch (\Exception $e) {
             $bot->sendMessage(
-                text: "⚠️ Xatolik yuz berdi: " . $e->getMessage(),
+                text: Text::Error("Videoni yangilashda xatolik", $e->getMessage()),
                 reply_markup: Keyboard::MainMenu($bot)
             );
             State::clearState($bot);

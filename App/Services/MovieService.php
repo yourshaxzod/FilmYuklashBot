@@ -21,14 +21,14 @@ class MovieService
             State::setState($bot, 'last_search_query', $query);
 
             if (Formatter::isNumericString($query)) {
-                $movie = Movie::findByCode($db, $query, $bot->userId());
+                $movie = Movie::findByID($db, $query, $bot->userId());
                 if ($movie) {
                     self::show($bot, $db, $movie);
                     return;
                 }
             }
 
-            $movies = Movie::search($db, $query, $bot->userId());
+            $movies = Movie::searchByText($db, $query, $bot->userId());
             if (empty($movies)) {
                 $bot->sendMessage(
                     text: "😞 <b>\"{$query}\"</b> bo'yicha hech narsa topilmadi.",
@@ -64,7 +64,7 @@ class MovieService
     {
         try {
             if (is_int($movie)) {
-                $movie = Movie::find($db, $movie, $bot->userId());
+                $movie = Movie::findByID($db, $movie, $bot->userId());
                 if (!$movie) {
                     throw new \Exception("Kino topilmadi.");
                 }
@@ -72,7 +72,7 @@ class MovieService
 
             Movie::addView($db, $bot->userId(), $movie['id']);
 
-            $videos = Video::getAllByMovie($db, $movie['id']);
+            $videos = Video::getAllByMovieID($db, $movie['id']);
             $videoCount = count($videos);
 
             $text = Text::MovieInfo($movie, $videoCount, Validator::isAdmin($bot));
@@ -147,7 +147,7 @@ class MovieService
         try {
             $userId = $bot->userId();
             $perPage = 10;
-            $trending = Movie::getTrending($db, $perPage, $userId);
+            $trending = Movie::getTrendingMovies($db, $perPage, $userId);
 
             if (empty($trending)) {
                 $bot->sendMessage(
@@ -158,7 +158,7 @@ class MovieService
                 return;
             }
 
-            $totalMovies = Movie::getCount($db);
+            $totalMovies = Movie::getCountMovies($db);
             $totalPages = ceil($totalMovies / $perPage);
 
             $message = "🔥 <b>Trend kinolar</b> (sahifa 1/{$totalPages})\n\n";
@@ -185,7 +185,7 @@ class MovieService
 
     public static function showMovie(Nutgram $bot, PDO $db, int $movieId): void
     {
-        $movie = Movie::find($db, $movieId, $bot->userId());
+        $movie = Movie::findByID($db, $movieId, $bot->userId());
         if (!$movie) {
             $bot->sendMessage(
                 text: "⚠️ Kino topilmadi!",
@@ -200,7 +200,7 @@ class MovieService
     public static function showMovieVideos(Nutgram $bot, PDO $db, int $movieId): void
     {
         try {
-            $movie = Movie::find($db, $movieId);
+            $movie = Movie::findByID($db, $movieId);
             if (!$movie) {
                 $bot->sendMessage(
                     text: "⚠️ Kino topilmadi!",
@@ -209,7 +209,7 @@ class MovieService
                 return;
             }
 
-            $videos = Video::getAllByMovie($db, $movieId);
+            $videos = Video::getAllByMovieID($db, $movieId);
 
             if (empty($videos)) {
                 $bot->sendMessage(
@@ -240,7 +240,7 @@ class MovieService
     public static function playVideo(Nutgram $bot, PDO $db, int $videoId): void
     {
         try {
-            $video = Video::find($db, $videoId);
+            $video = Video::findByID($db, $videoId);
             if (!$video) {
                 $bot->sendMessage(
                     text: "⚠️ Video topilmadi!",
@@ -258,7 +258,7 @@ class MovieService
 
             Movie::addView($db, $bot->userId(), $video['movie_id']);
 
-            $nextVideo = Video::findByPart($db, $video['movie_id'], $video['part_number'] + 1);
+            $nextVideo = Video::findByID($db, $video['movie_id']);
 
             if ($nextVideo) {
                 $bot->sendMessage(

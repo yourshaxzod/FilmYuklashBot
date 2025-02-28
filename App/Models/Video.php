@@ -8,17 +8,36 @@ use App\Helpers\Config;
 
 class Video
 {
-    public static function getAllByMovie(PDO $db, int $movieId): array
+    /**
+     * Kino uchun barcha videolarni olish.
+     * @param PDO $db Database ulanish.
+     * @param int $movieId Kino ID.
+     * @param int $limit Sahifadagi videolar soni.
+     * @param int $offset Boshlanish pozitsiyasi.
+     * @return array Videolar massivi.
+     */
+    public static function getAllByMovieID(PDO $db, int $movieId, int $limit = 10, int $offset = 0): array
     {
         try {
-            $sql = "SELECT v.*, m.title as movie_title
-                    FROM movie_videos v
-                    JOIN movies m ON v.movie_id = m.id
-                    WHERE v.movie_id = :movie_id
-                    ORDER BY v.id ASC";
+            $sql = "
+                SELECT 
+                    v.*, 
+                    m.title as movie_title
+                FROM 
+                    movie_videos v
+                JOIN 
+                    movies m ON v.movie_id = m.id
+                WHERE 
+                    v.movie_id = :movie_id
+                ORDER BY 
+                    v.part_number ASC
+                LIMIT :limit OFFSET :offset
+            ";
 
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':movie_id', $movieId, PDO::PARAM_INT);
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
             $stmt->execute();
 
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -27,49 +46,90 @@ class Video
         }
     }
 
-    public static function find(PDO $db, int $id): ?array
+    /**
+     * Kino uchun videolar sonini olish.
+     * @param PDO $db Database ulanish.
+     * @param int $movieId Kino ID.
+     * @return int Videolar soni.
+     */
+    public static function getCountByMovieID(PDO $db, int $movieId): int
     {
         try {
-            $sql = "SELECT v.*, m.title as movie_title, m.id as movie_id
-                    FROM movie_videos v
-                    JOIN movies m ON v.movie_id = m.id
-                    WHERE v.id = :id";
+            $sql = "SELECT COUNT(*) FROM movie_videos WHERE movie_id = :movie_id";
+            $stmt = $db->prepare($sql);
+            $stmt->bindValue(':movie_id', $movieId, PDO::PARAM_INT);
+            $stmt->execute();
+
+            return (int)$stmt->fetchColumn();
+        } catch (Exception $e) {
+            throw new Exception("Video sonini olishda xatolik: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Videoni ID bo'yicha topish.
+     * @param PDO $db Database ulanish.
+     * @param int $id Video ID.
+     * @return array|null Video ma'lumotlari yoki null.
+     */
+    public static function findByID(PDO $db, int $id): ?array
+    {
+        try {
+            $sql = "
+                SELECT 
+                    v.*, 
+                    m.title as movie_title, 
+                    m.id as movie_id
+                FROM 
+                    movie_videos v
+                JOIN 
+                    movies m ON v.movie_id = m.id
+                WHERE 
+                    v.id = :id
+            ";
 
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':id', $id, PDO::PARAM_INT);
             $stmt->execute();
 
-            return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+            $video = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$video) {
+                return null;
+            }
+
+            $video['id'] = (int)$video['id'];
+            $video['movie_id'] = (int)$video['movie_id'];
+            if (isset($video['duration'])) {
+                $video['duration'] = (int)$video['duration'];
+            }
+            if (isset($video['file_size'])) {
+                $video['file_size'] = (int)$video['file_size'];
+            }
+
+            return $video;
         } catch (Exception $e) {
             throw new Exception("Videoni olishda xatolik: " . $e->getMessage());
         }
     }
 
-    public static function findByPart(PDO $db, int $movieId, int $partNumber): ?array
-    {
-        try {
-            $sql = "SELECT v.*, m.title as movie_title
-                    FROM movie_videos v
-                    JOIN movies m ON v.movie_id = m.id
-                    WHERE v.movie_id = :movie_id AND v.id = :id";
-
-            $stmt = $db->prepare($sql);
-            $stmt->bindValue(':movie_id', $movieId, PDO::PARAM_INT);
-            $stmt->bindValue(':id', $partNumber, PDO::PARAM_INT);
-            $stmt->execute();
-
-            return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
-        } catch (Exception $e) {
-            throw new Exception("Videoni olishda xatolik: " . $e->getMessage());
-        }
-    }
-
+    /**
+     * Kino uchun keyingi qism raqamini olish.
+     * @param PDO $db Database ulanish.
+     * @param int $movieId Kino ID.
+     * @return int Keyingi qism raqami.
+     */
     public static function getNextPartNumber(PDO $db, int $movieId): int
     {
         try {
-            $sql = "SELECT MAX(id) as max_part 
-                    FROM movie_videos 
-                    WHERE movie_id = :movie_id";
+            $sql = "
+                SELECT 
+                    MAX(part_number) as max_part 
+                FROM 
+                    movie_videos 
+                WHERE 
+                    movie_id = :movie_id
+            ";
 
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':movie_id', $movieId, PDO::PARAM_INT);
@@ -82,27 +142,43 @@ class Video
         }
     }
 
+    /**
+     * Yangi video qo'shish.
+     * @param PDO $db Database ulanish.
+     * @param array $data Video ma'lumotlari.
+     * @return int Yangi video ID.
+     */
     public static function create(PDO $db, array $data): int
     {
         try {
             $db->beginTransaction();
 
-            $movie = Movie::find($db, $data['movie_id']);
+            $movie = Movie::findByID($db, $data['movie_id']);
             if (!$movie) {
                 throw new Exception("Kino topilmadi");
             }
 
-            $sql = "INSERT INTO movie_videos (
-                        movie_id, title, file_id, created_at
-                    ) VALUES (
-                        :movie_id, :title, :file_id, NOW()
-                    )";
+            $sql = "
+                INSERT INTO movie_videos (
+                    movie_id, 
+                    description, 
+                    file_id, 
+                    duration,
+                    file_size,
+                    created_at
+                ) VALUES (
+                    :movie_id, 
+                    :description, 
+                    :file_id,
+                    NOW()
+                )
+            ";
 
             $stmt = $db->prepare($sql);
             $stmt->execute([
                 'movie_id' => $data['movie_id'],
-                'title' => $data['title'],
-                'file_id' => $data['file_id']
+                'description' => $data['description'],
+                'file_id' => $data['file_id'],
             ]);
 
             $videoId = $db->lastInsertId();
@@ -115,29 +191,38 @@ class Video
         }
     }
 
+    /**
+     * Video ma'lumotlarini yangilash.
+     * @param PDO $db Database ulanish.
+     * @param int $id Video ID.
+     * @param array $data Yangilanadigan ma'lumotlar.
+     */
     public static function update(PDO $db, int $id, array $data): void
     {
         try {
             $db->beginTransaction();
 
-            // Check if video exists
-            $video = self::find($db, $id);
+            $video = self::findByID($db, $id);
             if (!$video) {
                 throw new Exception("Video topilmadi");
             }
 
             $fields = [];
             $values = [];
+
             foreach ($data as $field => $value) {
                 $fields[] = "$field = :$field";
                 $values[$field] = $value;
             }
+
             $values['id'] = $id;
             $values['updated_at'] = date('Y-m-d H:i:s');
 
-            $sql = "UPDATE movie_videos 
-                    SET " . implode(', ', $fields) . ", updated_at = :updated_at 
-                    WHERE id = :id";
+            $sql = "
+                UPDATE movie_videos 
+                SET " . implode(', ', $fields) . ", updated_at = :updated_at 
+                WHERE id = :id
+            ";
 
             $stmt = $db->prepare($sql);
             $stmt->execute($values);
@@ -149,70 +234,30 @@ class Video
         }
     }
 
+    /**
+     * Videoni o'chirish.
+     * @param PDO $db Database ulanish.
+     * @param int $id Video ID.
+     */
     public static function delete(PDO $db, int $id): void
     {
         try {
             $db->beginTransaction();
 
-            // Delete video
-            $stmt = $db->prepare("DELETE FROM movie_videos WHERE id = :id");
-            $stmt->bindValue(':id', $id, PDO::PARAM_INT);
-            $stmt->execute();
-
-            // If no rows affected, video didn't exist
-            if ($stmt->rowCount() === 0) {
+            $video = self::findByID($db, $id);
+            if (!$video) {
                 throw new Exception("Video topilmadi");
             }
+
+            $sql = "DELETE FROM movie_videos WHERE id = :id";
+            $stmt = $db->prepare($sql);
+            $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+            $stmt->execute();
 
             $db->commit();
         } catch (Exception $e) {
             $db->rollBack();
             throw new Exception("Videoni o'chirishda xatolik: " . $e->getMessage());
-        }
-    }
-
-    public static function reorderParts(PDO $db, int $movieId): void
-    {
-        try {
-            $db->beginTransaction();
-
-            // Get all videos ordered by part number
-            $videos = self::getAllByMovie($db, $movieId);
-
-            // Update part numbers to ensure sequential ordering
-            foreach ($videos as $index => $video) {
-                $newPartNumber = $index + 1;
-                if ($video['id'] !== $newPartNumber) {
-                    self::update($db, $video['id'], ['id' => $newPartNumber]);
-                }
-            }
-
-            $db->commit();
-        } catch (Exception $e) {
-            $db->rollBack();
-            throw new Exception("Qismlarni tartibga solishda xatolik: " . $e->getMessage());
-        }
-    }
-
-    public static function getStats(PDO $db, int $movieId): array
-    {
-        try {
-            $sql = "SELECT 
-                        COUNT(*) as total_parts,
-                        MIN(created_at) as first_added,
-                        MAX(created_at) as last_added,
-                        SUM(duration) as total_duration,
-                        SUM(file_size) as total_size
-                    FROM movie_videos
-                    WHERE movie_id = :movie_id";
-
-            $stmt = $db->prepare($sql);
-            $stmt->bindValue(':movie_id', $movieId, PDO::PARAM_INT);
-            $stmt->execute();
-
-            return $stmt->fetch(PDO::FETCH_ASSOC) ?: [];
-        } catch (Exception $e) {
-            throw new Exception("Statistikani olishda xatolik: " . $e->getMessage());
         }
     }
 }

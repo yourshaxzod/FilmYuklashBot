@@ -112,6 +112,26 @@ class Text
         return $text;
     }
 
+    public static function MovieNotFound(): string
+    {
+        return "Kino topilmadi.";
+    }
+
+    public static function VideoNotFound(): string
+    {
+        return "Video topilmadi.";
+    }
+
+    public static function NoPermission(): string
+    {
+        return "Sizda bu bo'limga kirish uchun ruxsat yo'q.";
+    }
+
+    public static function Error($message, $error): string
+    {
+        return "⚠️ <b>" . $message . ":</b> " . $error;
+    }
+
     public static function statisticsInfo(array $stats): string
     {
         $text = "📊 <b>Bot Statistikasi</b>\n\n";
