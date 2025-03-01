@@ -3,23 +3,24 @@
 namespace App\Handlers;
 
 use SergiX44\Nutgram\Nutgram;
-use App\Services\{MovieService, StatisticsService, ChannelService};
-use App\Helpers\{Menu, State, Validator};
-use App\Models\{Movie, Video};
+use App\Services\{MovieService, StatisticsService, ChannelService, TavsiyaService, CategoryService};
+use App\Helpers\{Menu, State, Validator, Config, Keyboard};
+use App\Models\{Movie, Video, Category, User};
 use PDO;
-
+use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 class CommandHandler
 {
     public static function register(Nutgram $bot, PDO $db): void
     {
         $bot->onCommand('.*', function (Nutgram $bot) {
-            State::clearState($bot);
+            State::clearAll($bot);
         });
 
         $bot->onCommand('start', function (Nutgram $bot) use ($db) {
-            self::registerUser($bot, $db);
+            $user = User::register($db, $bot);
 
-            if (!ChannelService::showSubscriptionRequirement($bot, $db)) {
+            if ($user && $user['status'] === 'blocked') {
+                $bot->sendMessage("⚠️ Kechirasiz, sizning hisobingiz bloklangan. Admin bilan bog'laning.");
                 return;
             }
 
@@ -27,30 +28,26 @@ class CommandHandler
         });
 
         $bot->onCommand('search', function (Nutgram $bot) use ($db) {
-            if (!ChannelService::showSubscriptionRequirement($bot, $db)) {
-                return;
-            }
-
             Menu::showSearchMenu($bot);
+
+            State::set($bot, 'state', 'search');
         });
 
         $bot->onCommand('favorites', function (Nutgram $bot) use ($db) {
-            if (!ChannelService::showSubscriptionRequirement($bot, $db)) {
-                return;
-            }
-
-            MovieService::showFavorites($bot, $db);
+            Menu::showFavoriteMenu($bot, $db);
         });
 
         $bot->onCommand('trending', function (Nutgram $bot) use ($db) {
-            if (!ChannelService::showSubscriptionRequirement($bot, $db)) {
-                return;
-            }
-
-            MovieService::showTrending($bot, $db);
+            Menu::showTrendingMenu($bot, $db);
         });
 
-        self::registerAdminCommands($bot, $db);
+        $bot->onCommand('categories', function (Nutgram $bot) use ($db) {
+            Menu::showCategoriesMenu($bot, $db);
+        });
+
+        $bot->onCommand('recommendations', function (Nutgram $bot) use ($db) {
+            Menu::showRecommendationsMenu($bot, $db);
+        });
 
         self::registerMenuButtons($bot, $db);
     }
@@ -58,43 +55,28 @@ class CommandHandler
     private static function registerMenuButtons(Nutgram $bot, PDO $db): void
     {
         $bot->onText('🔍 Qidirish', function (Nutgram $bot) use ($db) {
-            if (!ChannelService::showSubscriptionRequirement($bot, $db)) {
-                return;
-            }
-
             Menu::showSearchMenu($bot);
+
+            State::set($bot, 'state', 'search');
         });
 
         $bot->onText('❤️ Sevimlilar', function (Nutgram $bot) use ($db) {
-            if (!ChannelService::showSubscriptionRequirement($bot, $db)) {
-                return;
-            }
-
-            MovieService::showFavorites($bot, $db);
+            Menu::showFavoriteMenu($bot, $db);
         });
 
         $bot->onText('🔥 Trendlar', function (Nutgram $bot) use ($db) {
-            if (!ChannelService::showSubscriptionRequirement($bot, $db)) {
-                return;
-            }
-
-            MovieService::showTrending($bot, $db);
+            Menu::showTrendingMenu($bot, $db);
         });
 
-        $bot->onText('↩️ Ortga qaytish', function (Nutgram $bot) {
-            State::clearState($bot);
-            Menu::showMainMenu($bot);
+        $bot->onText('🎭 Janrlar', function (Nutgram $bot) use ($db) {
+            Menu::showCategoriesMenu($bot, $db);
         });
 
-        $bot->onText('🚫 Bekor qilish', function (Nutgram $bot) {
-            State::clearState($bot);
-            Menu::showMainMenu($bot);
+        $bot->onText('⭐️ Tavsiyalar', function (Nutgram $bot) use ($db) {
+            Menu::showRecommendationsMenu($bot, $db);
         });
-    }
 
-    private static function registerAdminCommands(Nutgram $bot): void
-    {
-        $bot->onText("🛠 Statistika va Boshqaruv", function (Nutgram $bot) {
+        $bot->onText('🛠 Admin panel', function (Nutgram $bot) {
             if (!Validator::isAdmin($bot)) {
                 $bot->sendMessage("⚠️ Sizda admin huquqlari yo'q!");
                 return;
@@ -103,7 +85,27 @@ class CommandHandler
             Menu::showAdminMenu($bot);
         });
 
-        $bot->onText("🎬 Kinolar", function (Nutgram $bot) {
+        $bot->onText('↩️ Orqaga', function (Nutgram $bot) {
+            State::clearAll($bot);
+            Menu::showMainMenu($bot);
+        });
+
+        $bot->onText('🚫 Bekor qilish', function (Nutgram $bot) {
+            State::clearAll($bot);
+            Menu::showMainMenu($bot);
+        });
+
+        $bot->onText('◀️ Admin panelga qaytish', function (Nutgram $bot) {
+            if (!Validator::isAdmin($bot)) {
+                $bot->sendMessage("⚠️ Sizda admin huquqlari yo'q!");
+                return;
+            }
+
+            State::clearAll($bot);
+            Menu::showAdminMenu($bot);
+        });
+
+        $bot->onText('🎬 Kinolar', function (Nutgram $bot) {
             if (!Validator::isAdmin($bot)) {
                 return;
             }
@@ -111,26 +113,50 @@ class CommandHandler
             Menu::showMovieManageMenu($bot);
         });
 
+        $bot->onText('🏷 Kategoriyalar', function (Nutgram $bot) use ($db) {
+            if (!Validator::isAdmin($bot)) {
+                return;
+            }
+
+            CategoryService::showCategoryList($bot, $db, true);
+        });
+
+        $bot->onText('🔐 Kanallar', function (Nutgram $bot) use ($db) {
+            if (!Validator::isAdmin($bot)) {
+                return;
+            }
+
+            ChannelService::showChannels($bot, $db);
+        });
+
+        $bot->onText('📊 Statistika', function (Nutgram $bot) use ($db) {
+            if (!Validator::isAdmin($bot)) {
+                return;
+            }
+
+            StatisticsService::showStats($bot, $db);
+        });
+
+        $bot->onText('📬 Xabarlar', function (Nutgram $bot) {
+            if (!Validator::isAdmin($bot)) {
+                return;
+            }
+
+            State::set($bot, 'state', 'broadcast_message');
+            $bot->sendMessage(
+                text: "📣 <b>Foydalanuvchilarga xabar yuborish</b>\n\nYubormoqchi bo'lgan xabarni kiriting:", 
+                parse_mode: ParseMode::HTML,
+                reply_markup: Keyboard::cancel()
+            );
+        });
+
         $bot->onText("➕ Kino qo'shish", function (Nutgram $bot) {
             if (!Validator::isAdmin($bot)) {
                 return;
             }
 
-            State::setState($bot, 'state', 'add_movie_title');
+            State::setState($bot, 'add_movie_title');
             Menu::showAddMovieGuide($bot);
-        });
-
-        $bot->onText("✏️ Tahrirlash", function (Nutgram $bot) {
-            if (!Validator::isAdmin($bot)) {
-                return;
-            }
-
-            State::setState($bot, 'state', 'edit_movie_id');
-            $bot->sendMessage(
-                text: "✏️ <b>Kinoni tahrirlash</b>\n\n" .
-                    "Tahrirlash uchun kino ID raqamini kiriting:",
-                parse_mode: 'HTML'
-            );
         });
 
         $bot->onText("➖ Kino o'chirish", function (Nutgram $bot) {
@@ -138,54 +164,45 @@ class CommandHandler
                 return;
             }
 
-            State::setState($bot, 'state', 'delete_movie_id');
+            State::set($bot, 'state', 'delete_movie_id');
             $bot->sendMessage(
-                text: "🗑 <b>Kinoni o'chirish</b>\n\n" .
-                    "O'chirish uchun kino ID raqamini kiriting:",
-                parse_mode: 'HTML'
+                text: "🗑 <b>Kinoni o'chirish</b>\n\nO'chirish uchun kino ID raqamini kiriting:",
+                parse_mode: 'HTML',
+                reply_markup: Keyboard::back()
             );
         });
 
-        $bot->onText("◀️ Admin panelga qaytish", function (Nutgram $bot) {
+        $bot->onText("✏️ Tahrirlash", function (Nutgram $bot) {
             if (!Validator::isAdmin($bot)) {
                 return;
             }
 
-            Menu::showAdminMenu($bot);
+            State::set($bot, 'state', 'edit_movie_id');
+            $bot->sendMessage(
+                text: "✏️ <b>Kinoni tahrirlash</b>\n\nTahrirlash uchun kino ID raqamini kiriting:",
+                parse_mode: 'HTML',
+                reply_markup: Keyboard::back()
+            );
         });
-    }
 
-    private static function registerUser(Nutgram $bot, PDO $db): void
-    {
-        try {
-            $userId = $bot->userId();
-            $user = $bot->user();
-
-            if (!$userId || !$user) {
+        $bot->onText("📋 Ro'yxat", function (Nutgram $bot) use ($db) {
+            if (!Validator::isAdmin($bot)) {
                 return;
             }
 
-            $stmt = $db->prepare("SELECT id FROM users WHERE user_id = ?");
-            $stmt->execute([$userId]);
-            $existing = $stmt->fetch();
+            State::set($bot, 'state', 'movie_list_page');
+            State::set($bot, 'movie_list_page', 1);
 
-            if ($existing) {
-                $stmt = $db->prepare("UPDATE users SET status = 'active', updated_at = NOW() WHERE user_id = ?");
-                $stmt->execute([$userId]);
+            MovieService::showMoviesList($bot, $db, 1);
+        });
+
+        $bot->onText("➕ Kategoriya qo'shish", function (Nutgram $bot) {
+            if (!Validator::isAdmin($bot)) {
                 return;
             }
 
-            $stmt = $db->prepare("
-                INSERT INTO users (user_id, status, created_at) 
-                VALUES (?, 'active', NOW())
-            ");
-            $stmt->execute([
-                $userId,
-            ]);
-        } catch (\Exception $e) {
-            if (class_exists('App\Helpers\Config') && method_exists('App\Helpers\Config', 'isDebugMode') && \App\Helpers\Config::isDebugMode()) {
-                error_log("User registration error: " . $e->getMessage());
-            }
-        }
+            State::set($bot, 'state', 'add_category_name');
+            Menu::showAddCategoryGuide($bot);
+        });
     }
 }

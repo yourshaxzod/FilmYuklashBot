@@ -217,8 +217,8 @@ class VideoService
                 return;
             }
 
-            State::setState($bot, 'state', 'add_video');
-            State::setState($bot, 'movie_id', (string)$movieId);
+            State::set($bot, 'state', 'add_video');
+            State::set($bot, 'movie_id', (string)$movieId);
 
             $nextId = Video::getNextPartNumber($db, $movieId);
 
@@ -233,7 +233,7 @@ class VideoService
                 reply_markup: Keyboard::Cancel()
             );
 
-            State::setState($bot, 'state', 'add_video_title');
+            State::set($bot, 'state', 'add_video_title');
         } catch (\Exception $e) {
             $bot->sendMessage(
                 text: Text::Error("Video qo'shishda xatolik", $e->getMessage()),
@@ -262,8 +262,8 @@ class VideoService
                 return;
             }
 
-            State::setState($bot, 'state', "edit_video_{$videoId}");
-            State::setState($bot, 'movie_id', (string)$video['movie_id']);
+            State::set($bot, 'state', "edit_video_{$videoId}");
+            State::set($bot, 'movie_id', (string)$video['movie_id']);
 
             $message = "✏️ <b>Videoni tahrirlash</b>\n\n" .
                 "🎬 <b>Kino:</b> {$video['movie_title']}\n" .
@@ -344,7 +344,7 @@ class VideoService
                 return;
             }
 
-            State::setState($bot, 'video_title', $title);
+            State::set($bot, 'video_title', $title);
 
             $movieId = (int)$bot->getUserData('movie_id');
 
@@ -361,7 +361,7 @@ class VideoService
                 reply_markup: Keyboard::Cancel()
             );
 
-            State::setState($bot, 'state', 'add_video');
+            State::set($bot, 'state', 'add_video');
         } catch (\Exception $e) {
             $bot->sendMessage(
                 text: Text::Error("Sarlavhani qayta ishlashda xatolik", $e->getMessage()),
@@ -400,15 +400,15 @@ class VideoService
             $videoTitle = $bot->getUserData('video_title');
 
             if (empty($videoTitle)) {
-                State::setState($bot, 'state', 'add_video_title');
-                State::setState($bot, 'file_id', $video->file_id);
+                State::set($bot, 'state', 'add_video_title');
+                State::set($bot, 'file_id', $video->file_id);
 
                 if (isset($video->duration)) {
-                    State::setState($bot, 'video_duration', (string)$video->duration);
+                    State::set($bot, 'video_duration', (string)$video->duration);
                 }
 
                 if (isset($video->file_size)) {
-                    State::setState($bot, 'video_file_size', (string)$video->file_size);
+                    State::set($bot, 'video_file_size', (string)$video->file_size);
                 }
 
                 $bot->sendMessage(
@@ -487,11 +487,11 @@ class VideoService
                 reply_markup: Keyboard::MainMenu($bot)
             );
 
-            State::setState($bot, 'state', 'add_video');
-            State::setState($bot, 'video_title', null);
-            State::setState($bot, 'file_id', null);
-            State::setState($bot, 'video_duration', null);
-            State::setState($bot, 'video_file_size', null);
+            State::set($bot, 'state', 'add_video');
+            State::set($bot, 'video_title', null);
+            State::set($bot, 'file_id', null);
+            State::set($bot, 'video_duration', null);
+            State::set($bot, 'video_file_size', null);
         } catch (\Exception $e) {
             $bot->sendMessage(
                 text: Text::Error("Video qo'shishda xatolik", $e->getMessage()),

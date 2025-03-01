@@ -4,19 +4,10 @@ namespace App\Models;
 
 use PDO;
 use Exception;
-use App\Helpers\Config;
 
 class Video
 {
-    /**
-     * Kino uchun barcha videolarni olish.
-     * @param PDO $db Database ulanish.
-     * @param int $movieId Kino ID.
-     * @param int $limit Sahifadagi videolar soni.
-     * @param int $offset Boshlanish pozitsiyasi.
-     * @return array Videolar massivi.
-     */
-    public static function getAllByMovieID(PDO $db, int $movieId, int $limit = 10, int $offset = 0): array
+    public static function getAllByMovieId(PDO $db, int $movieId, int $limit = 10, int $offset = 0): array
     {
         try {
             $sql = "
@@ -46,13 +37,7 @@ class Video
         }
     }
 
-    /**
-     * Kino uchun videolar sonini olish.
-     * @param PDO $db Database ulanish.
-     * @param int $movieId Kino ID.
-     * @return int Videolar soni.
-     */
-    public static function getCountByMovieID(PDO $db, int $movieId): int
+    public static function getCountByMovieId(PDO $db, int $movieId): int
     {
         try {
             $sql = "SELECT COUNT(*) FROM movie_videos WHERE movie_id = :movie_id";
@@ -66,13 +51,7 @@ class Video
         }
     }
 
-    /**
-     * Videoni ID bo'yicha topish.
-     * @param PDO $db Database ulanish.
-     * @param int $id Video ID.
-     * @return array|null Video ma'lumotlari yoki null.
-     */
-    public static function findByID(PDO $db, int $id): ?array
+    public static function findById(PDO $db, int $id): ?array
     {
         try {
             $sql = "
@@ -98,13 +77,37 @@ class Video
                 return null;
             }
 
-            $video['id'] = (int)$video['id'];
-            $video['movie_id'] = (int)$video['movie_id'];
-            if (isset($video['duration'])) {
-                $video['duration'] = (int)$video['duration'];
-            }
-            if (isset($video['file_size'])) {
-                $video['file_size'] = (int)$video['file_size'];
+            return $video;
+        } catch (Exception $e) {
+            throw new Exception("Videoni olishda xatolik: " . $e->getMessage());
+        }
+    }
+
+    public static function findByPart(PDO $db, int $movieId, int $partNumber): ?array
+    {
+        try {
+            $sql = "
+                SELECT 
+                    v.*, 
+                    m.title as movie_title
+                FROM 
+                    movie_videos v
+                JOIN 
+                    movies m ON v.movie_id = m.id
+                WHERE 
+                    v.movie_id = :movie_id
+                    AND v.part_number = :part_number
+            ";
+
+            $stmt = $db->prepare($sql);
+            $stmt->bindValue(':movie_id', $movieId, PDO::PARAM_INT);
+            $stmt->bindValue(':part_number', $partNumber, PDO::PARAM_INT);
+            $stmt->execute();
+
+            $video = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$video) {
+                return null;
             }
 
             return $video;
@@ -113,12 +116,6 @@ class Video
         }
     }
 
-    /**
-     * Kino uchun keyingi qism raqamini olish.
-     * @param PDO $db Database ulanish.
-     * @param int $movieId Kino ID.
-     * @return int Keyingi qism raqami.
-     */
     public static function getNextPartNumber(PDO $db, int $movieId): int
     {
         try {
@@ -142,33 +139,68 @@ class Video
         }
     }
 
-    /**
-     * Yangi video qo'shish.
-     * @param PDO $db Database ulanish.
-     * @param array $data Video ma'lumotlari.
-     * @return int Yangi video ID.
-     */
+    public static function getNextVideo(PDO $db, int $movieId, int $currentPartNumber): ?array
+    {
+        try {
+            $sql = "
+                SELECT 
+                    v.*, 
+                    m.title as movie_title
+                FROM 
+                    movie_videos v
+                JOIN 
+                    movies m ON v.movie_id = m.id
+                WHERE 
+                    v.movie_id = :movie_id
+                    AND v.part_number > :current_part_number
+                ORDER BY 
+                    v.part_number ASC
+                LIMIT 1
+            ";
+
+            $stmt = $db->prepare($sql);
+            $stmt->bindValue(':movie_id', $movieId, PDO::PARAM_INT);
+            $stmt->bindValue(':current_part_number', $currentPartNumber, PDO::PARAM_INT);
+            $stmt->execute();
+
+            $video = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$video) {
+                return null;
+            }
+
+            return $video;
+        } catch (Exception $e) {
+            throw new Exception("Keyingi videoni olishda xatolik: " . $e->getMessage());
+        }
+    }
+
     public static function create(PDO $db, array $data): int
     {
         try {
             $db->beginTransaction();
 
-            $movie = Movie::findByID($db, $data['movie_id']);
+            $movie = Movie::findById($db, $data['movie_id']);
             if (!$movie) {
                 throw new Exception("Kino topilmadi");
+            }
+
+            $existing = self::findByPart($db, $data['movie_id'], $data['part_number']);
+            if ($existing) {
+                throw new Exception("Bu qism raqami allaqachon mavjud");
             }
 
             $sql = "
                 INSERT INTO movie_videos (
                     movie_id, 
-                    description, 
+                    title, 
+                    part_number, 
                     file_id, 
-                    duration,
-                    file_size,
                     created_at
                 ) VALUES (
                     :movie_id, 
-                    :description, 
+                    :title, 
+                    :part_number, 
                     :file_id,
                     NOW()
                 )
@@ -177,7 +209,8 @@ class Video
             $stmt = $db->prepare($sql);
             $stmt->execute([
                 'movie_id' => $data['movie_id'],
-                'description' => $data['description'],
+                'title' => $data['title'],
+                'part_number' => $data['part_number'],
                 'file_id' => $data['file_id'],
             ]);
 
@@ -191,20 +224,21 @@ class Video
         }
     }
 
-    /**
-     * Video ma'lumotlarini yangilash.
-     * @param PDO $db Database ulanish.
-     * @param int $id Video ID.
-     * @param array $data Yangilanadigan ma'lumotlar.
-     */
     public static function update(PDO $db, int $id, array $data): void
     {
         try {
             $db->beginTransaction();
 
-            $video = self::findByID($db, $id);
+            $video = self::findById($db, $id);
             if (!$video) {
                 throw new Exception("Video topilmadi");
+            }
+
+            if (isset($data['part_number']) && $data['part_number'] != $video['part_number']) {
+                $existing = self::findByPart($db, $video['movie_id'], $data['part_number']);
+                if ($existing) {
+                    throw new Exception("Bu qism raqami allaqachon mavjud");
+                }
             }
 
             $fields = [];
@@ -234,17 +268,12 @@ class Video
         }
     }
 
-    /**
-     * Videoni o'chirish.
-     * @param PDO $db Database ulanish.
-     * @param int $id Video ID.
-     */
     public static function delete(PDO $db, int $id): void
     {
         try {
             $db->beginTransaction();
 
-            $video = self::findByID($db, $id);
+            $video = self::findById($db, $id);
             if (!$video) {
                 throw new Exception("Video topilmadi");
             }

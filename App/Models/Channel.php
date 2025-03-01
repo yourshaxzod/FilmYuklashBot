@@ -4,6 +4,7 @@ namespace App\Models;
 
 use PDO;
 use Exception;
+use SergiX44\Nutgram\Nutgram;
 
 class Channel
 {
@@ -51,6 +52,17 @@ class Channel
         }
     }
 
+    public static function findByChatId(PDO $db, int $chatId): ?array
+    {
+        try {
+            $stmt = $db->prepare("SELECT * FROM channels WHERE chat_id = ?");
+            $stmt->execute([$chatId]);
+            return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
+        } catch (Exception $e) {
+            throw new Exception("Kanalni olishda xatolik: " . $e->getMessage());
+        }
+    }
+
     public static function create(PDO $db, array $data): int
     {
         try {
@@ -63,6 +75,13 @@ class Channel
                     throw new Exception("Bu username bilan kanal allaqachon mavjud");
                 }
                 $data['username'] = $username;
+            }
+
+            if (isset($data['chat_id'])) {
+                $existing = self::findByChatId($db, $data['chat_id']);
+                if ($existing) {
+                    throw new Exception("Bu chat ID bilan kanal allaqachon mavjud");
+                }
             }
 
             $sql = "INSERT INTO channels (username, title, chat_id, is_active, created_at) 
@@ -103,6 +122,13 @@ class Channel
                     throw new Exception("Bu username bilan boshqa kanal mavjud");
                 }
                 $data['username'] = $username;
+            }
+
+            if (isset($data['chat_id']) && $data['chat_id'] != $channel['chat_id']) {
+                $existing = self::findByChatId($db, $data['chat_id']);
+                if ($existing && $existing['id'] != $id) {
+                    throw new Exception("Bu chat ID bilan boshqa kanal mavjud");
+                }
             }
 
             $fields = [];
@@ -180,7 +206,7 @@ class Channel
         }
     }
 
-    public static function checkUserSubscription(\SergiX44\Nutgram\Nutgram $bot, PDO $db, int $userId): array
+    public static function checkUserSubscription(Nutgram $bot, PDO $db, int $userId): array
     {
         $channels = self::getActive($db);
         $notSubscribed = [];
@@ -203,5 +229,37 @@ class Channel
         }
 
         return $notSubscribed;
+    }
+
+    public static function checkBotIsAdmin(Nutgram $bot, string $username): ?array
+    {
+        $username = ltrim($username, '@');
+
+        try {
+            $chat = $bot->getChat('@' . $username);
+
+            if ($chat->type !== 'channel') {
+                return null;
+            }
+
+            $botInfo = $bot->getMe();
+
+            $chatMember = $bot->getChatMember(
+                chat_id: $chat->id,
+                user_id: $botInfo->id
+            );
+
+            if (!in_array($chatMember->status, ['creator', 'administrator'])) {
+                return null;
+            }
+
+            return [
+                'username' => $username,
+                'title' => $chat->title,
+                'chat_id' => $chat->id
+            ];
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 }

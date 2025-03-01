@@ -9,6 +9,7 @@ use Dotenv\Dotenv;
 class Config
 {
     private static bool $loaded = false;
+
     private static array $cache = [];
 
     public static function load(): void
@@ -32,6 +33,9 @@ class Config
             'ITEMS_PER_PAGE' => (int)($_ENV['ITEMS_PER_PAGE'] ?? 10),
             'DEBUG_MODE' => (bool)($_ENV['DEBUG_MODE'] ?? false),
             'CACHE_TTL' => (int)($_ENV['CACHE_TTL'] ?? 3600),
+            'RECOMMENDATION_THRESHOLD' => (float)($_ENV['RECOMMENDATION_THRESHOLD'] ?? 0.5),
+            'INTEREST_INCREMENT' => (float)($_ENV['INTEREST_INCREMENT'] ?? 0.2),
+            'MAX_INTEREST_SCORE' => (float)($_ENV['MAX_INTEREST_SCORE'] ?? 5.0),
         ];
 
         self::$loaded = true;
@@ -67,5 +71,20 @@ class Config
     public static function getCacheTTL(): int
     {
         return self::get('CACHE_TTL', 3600);
+    }
+
+    public static function getRecommendationThreshold(): float
+    {
+        return self::get('RECOMMENDATION_THRESHOLD', 0.5);
+    }
+
+    public static function getInterestIncrement(): float
+    {
+        return self::get('INTEREST_INCREMENT', 0.2);
+    }
+
+    public static function getMaxInterestScore(): float
+    {
+        return self::get('MAX_INTEREST_SCORE', 5.0);
     }
 }

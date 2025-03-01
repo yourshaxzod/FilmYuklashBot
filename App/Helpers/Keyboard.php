@@ -13,46 +13,54 @@ use SergiX44\Nutgram\Telegram\Types\Keyboard\{
 
 class Keyboard
 {
-    public static function MainMenu(Nutgram $bot): ReplyKeyboardMarkup
+    public static function mainMenu(Nutgram $bot): ReplyKeyboardMarkup
     {
         $keyboard = ReplyKeyboardMarkup::make(resize_keyboard: true)
             ->addRow(
                 KeyboardButton::make('🔍 Qidirish'),
                 KeyboardButton::make('❤️ Sevimlilar'),
                 KeyboardButton::make('🔥 Trendlar'),
+            )
+            ->addRow(
+                KeyboardButton::make('🎭 Janrlar'),
+                KeyboardButton::make('⭐️ Tavsiyalar')
             );
 
         if (Validator::isAdmin($bot)) {
             $keyboard->addRow(
-                KeyboardButton::make('🛠 Statistika va Boshqaruv')
+                KeyboardButton::make('🛠 Admin panel')
             );
         }
 
         return $keyboard;
     }
 
-    public static function AdminMenu(): ReplyKeyboardMarkup
+    public static function adminMenu(): ReplyKeyboardMarkup
     {
         return ReplyKeyboardMarkup::make(resize_keyboard: true)
             ->addRow(
                 KeyboardButton::make('🎬 Kinolar'),
-                KeyboardButton::make('🔐 Kanallar')
+                KeyboardButton::make('🎭 Janrlar')
             )
             ->addRow(
-                KeyboardButton::make('📊 Statistika'),
-                KeyboardButton::make('📬 Habarlar')
+                KeyboardButton::make('🔐 Kanallar'),
+                KeyboardButton::make('📊 Statistika')
             )
             ->addRow(
-                KeyboardButton::make('↩️ Ortga qaytish')
+                KeyboardButton::make('📬 Xabarlar'),
+                KeyboardButton::make('⚙️ Sozlamalar')
+            )
+            ->addRow(
+                KeyboardButton::make('↩️ Orqaga')
             );
     }
 
-    public static function MovieManageMenu(): ReplyKeyboardMarkup
+    public static function movieManageMenu(): ReplyKeyboardMarkup
     {
         return ReplyKeyboardMarkup::make(resize_keyboard: true)
             ->addRow(
                 KeyboardButton::make("➕ Kino qo'shish"),
-                KeyboardButton::make("➖ Kino o'chirish"),
+                KeyboardButton::make("➖ Kino o'chirish")
             )
             ->addRow(
                 KeyboardButton::make("✏️ Tahrirlash"),
@@ -63,7 +71,23 @@ class Keyboard
             );
     }
 
-    public static function Cancel(): ReplyKeyboardMarkup
+    public static function categoryManageMenu(): ReplyKeyboardMarkup
+    {
+        return ReplyKeyboardMarkup::make(resize_keyboard: true)
+            ->addRow(
+                KeyboardButton::make("➕ Kategoriya qo'shish"),
+                KeyboardButton::make("➖ Kategoriya o'chirish")
+            )
+            ->addRow(
+                KeyboardButton::make("✏️ Tahrirlash"),
+                KeyboardButton::make("📋 Ro'yxat")
+            )
+            ->addRow(
+                KeyboardButton::make('◀️ Admin panelga qaytish')
+            );
+    }
+
+    public static function cancel(): ReplyKeyboardMarkup
     {
         return ReplyKeyboardMarkup::make(resize_keyboard: true)
             ->addRow(
@@ -71,15 +95,15 @@ class Keyboard
             );
     }
 
-    public static function BackMain(): ReplyKeyboardMarkup
+    public static function back(): ReplyKeyboardMarkup
     {
         return ReplyKeyboardMarkup::make(resize_keyboard: true)
             ->addRow(
-                KeyboardButton::make('↩️ Ortga qaytish')
+                KeyboardButton::make('↩️ Orqaga')
             );
     }
 
-    public static function Confirm(): ReplyKeyboardMarkup
+    public static function confirm(): ReplyKeyboardMarkup
     {
         return ReplyKeyboardMarkup::make(resize_keyboard: true)
             ->addRow(
@@ -88,16 +112,16 @@ class Keyboard
             );
     }
 
-    public static function Remove(): ReplyKeyboardRemove
+    public static function remove(): ReplyKeyboardRemove
     {
         return ReplyKeyboardRemove::make(true);
     }
 
-    public static function MovieActions(array $movie, array $video, bool $isAdmin = false): InlineKeyboardMarkup
+    public static function movieActions(array $movie, array $extra, bool $isAdmin = false): InlineKeyboardMarkup
     {
         $keyboard = InlineKeyboardMarkup::make();
 
-        if (($video['video_count'] ?? 0) > 0) {
+        if (($extra['video_count'] ?? 0) > 0) {
             $keyboard->addRow(
                 InlineKeyboardButton::make(
                     text: "▶️ Tomosha qilish",
@@ -106,21 +130,36 @@ class Keyboard
             );
         }
 
-        $likeText = ($video['is_liked'] ?? false) ? "❤️ " . $movie['likes'] : "🤍 " . $movie['likes'];
+        $likeText = ($extra['is_liked'] ?? false) ? "❤️ " . $movie['likes'] : "🤍 " . $movie['likes'];
         $keyboard->addRow(
             InlineKeyboardButton::make(
                 text: "👁 " . $movie['views'],
-                callback_data: "like_movie_{$movie['id']}"
+                callback_data: "noop"
             ),
             InlineKeyboardButton::make(
                 text: $likeText,
                 callback_data: "like_movie_{$movie['id']}"
             ),
             InlineKeyboardButton::make(
-                text: "↪️",
-                switch_inline_query: "test"
+                text: "↗️ Ulashish",
+                switch_inline_query: "movie_{$movie['id']}"
             )
         );
+
+        if (!empty($extra['categories'])) {
+            $buttons = [];
+            foreach ($extra['categories'] as $category) {
+                $buttons[] = InlineKeyboardButton::make(
+                    text: "#{$category['name']}",
+                    callback_data: "category_{$category['id']}"
+                );
+            }
+
+            $chunks = array_chunk($buttons, 3);
+            foreach ($chunks as $chunk) {
+                $keyboard->addRow(...$chunk);
+            }
+        }
 
         if ($isAdmin) {
             $keyboard->addRow(
@@ -138,7 +177,7 @@ class Keyboard
         return $keyboard;
     }
 
-    public static function MovieEditActions(int $movieId): InlineKeyboardMarkup
+    public static function movieEditActions(int $movieId): InlineKeyboardMarkup
     {
         return InlineKeyboardMarkup::make()
             ->addRow(
@@ -147,8 +186,8 @@ class Keyboard
                     callback_data: "edit_movie_title_{$movieId}"
                 ),
                 InlineKeyboardButton::make(
-                    text: "✏️ Kod",
-                    callback_data: "edit_movie_code_{$movieId}"
+                    text: "✏️ Yil",
+                    callback_data: "edit_movie_year_{$movieId}"
                 )
             )
             ->addRow(
@@ -163,6 +202,12 @@ class Keyboard
             )
             ->addRow(
                 InlineKeyboardButton::make(
+                    text: "🏷 Kategoriyalarni boshqarish",
+                    callback_data: "manage_movie_categories_{$movieId}"
+                )
+            )
+            ->addRow(
+                InlineKeyboardButton::make(
                     text: "📹 Video qismlar",
                     callback_data: "manage_videos_{$movieId}"
                 )
@@ -170,20 +215,20 @@ class Keyboard
             ->addRow(
                 InlineKeyboardButton::make(
                     text: "🔙 Orqaga",
-                    callback_data: "back_to_movie_menu"
+                    callback_data: "movie_{$movieId}"
                 )
             );
     }
 
-    public static function MovieList(array $movies): InlineKeyboardMarkup
+    public static function movieList(array $movies): InlineKeyboardMarkup
     {
         $keyboard = InlineKeyboardMarkup::make();
 
         foreach ($movies as $movie) {
             $keyboard->addRow(
                 InlineKeyboardButton::make(
-                    text: "📹 {$movie['title']}",
-                    callback_data: "play_video_{$movie['id']}"
+                    text: "🎬 {$movie['title']}",
+                    callback_data: "movie_{$movie['id']}"
                 )
             );
         }
@@ -191,23 +236,52 @@ class Keyboard
         return $keyboard;
     }
 
-    public static function VideoList(array $videos, int $movieId): InlineKeyboardMarkup
+    public static function videoList(array $videos, int $movieId, bool $isAdmin = false): InlineKeyboardMarkup
     {
         $keyboard = InlineKeyboardMarkup::make();
 
         foreach ($videos as $video) {
-            $keyboard->addRow(
+            $row = [
                 InlineKeyboardButton::make(
                     text: "📹 {$video['part_number']}-qism",
                     callback_data: "play_video_{$video['id']}"
                 )
+            ];
+
+            if ($isAdmin) {
+                $row[] = InlineKeyboardButton::make(
+                    text: "✏️",
+                    callback_data: "edit_video_{$video['id']}"
+                );
+                $row[] = InlineKeyboardButton::make(
+                    text: "🗑",
+                    callback_data: "delete_video_{$video['id']}"
+                );
+            }
+
+            $keyboard->addRow(...$row);
+        }
+
+        if ($isAdmin) {
+            $keyboard->addRow(
+                InlineKeyboardButton::make(
+                    text: "➕ Video qo'shish",
+                    callback_data: "add_video_{$movieId}"
+                )
             );
         }
+
+        $keyboard->addRow(
+            InlineKeyboardButton::make(
+                text: "🔙 Kinoga qaytish",
+                callback_data: "movie_{$movieId}"
+            )
+        );
 
         return $keyboard;
     }
 
-    public static function ChannelActions(): InlineKeyboardMarkup
+    public static function channelActions(): InlineKeyboardMarkup
     {
         return InlineKeyboardMarkup::make()
             ->addRow(
@@ -222,7 +296,43 @@ class Keyboard
             );
     }
 
-    public static function Pagination(
+    public static function categoryList(array $categories, bool $isAdmin = false): InlineKeyboardMarkup
+    {
+        $keyboard = InlineKeyboardMarkup::make();
+
+        foreach ($categories as $category) {
+            $row = [
+                InlineKeyboardButton::make(
+                    text: "🏷 {$category['name']}",
+                    callback_data: "category_{$category['id']}"
+                )
+            ];
+
+            if ($isAdmin) {
+                $row[] = InlineKeyboardButton::make(
+                    text: "✏️",
+                    callback_data: "edit_category_{$category['id']}"
+                );
+                $row[] = InlineKeyboardButton::make(
+                    text: "🗑",
+                    callback_data: "delete_category_{$category['id']}"
+                );
+            }
+
+            $keyboard->addRow(...$row);
+        }
+
+        $keyboard->addRow(
+            InlineKeyboardButton::make(
+                text: "🔙 Orqaga",
+                callback_data: "back_to_main"
+            )
+        );
+
+        return $keyboard;
+    }
+
+    public static function pagination(
         string $action,
         int $currentPage,
         int $totalPages,
@@ -262,7 +372,7 @@ class Keyboard
         return $keyboard;
     }
 
-    public static function StatActions(): InlineKeyboardMarkup
+    public static function statisticsActions(): InlineKeyboardMarkup
     {
         return InlineKeyboardMarkup::make()
             ->addRow(
@@ -273,7 +383,7 @@ class Keyboard
             );
     }
 
-    public static function ConfirmDelete(string $type, int $id): InlineKeyboardMarkup
+    public static function confirmDelete(string $type, int $id): InlineKeyboardMarkup
     {
         return InlineKeyboardMarkup::make()
             ->addRow(
@@ -283,12 +393,12 @@ class Keyboard
                 ),
                 InlineKeyboardButton::make(
                     text: "🚫 Yo'q",
-                    callback_data: "cancel_delete_{$type}_{$id}"
+                    callback_data: "cancel_delete_{$type}"
                 )
             );
     }
 
-    public static function SearchResults(array $movies): InlineKeyboardMarkup
+    public static function searchResults(array $movies): InlineKeyboardMarkup
     {
         $keyboard = InlineKeyboardMarkup::make();
 
@@ -304,15 +414,57 @@ class Keyboard
         return $keyboard;
     }
 
-    public static function statisticsActions(): InlineKeyboardMarkup
+    public static function subscriptionButtons(array $channels): InlineKeyboardMarkup
     {
-        return InlineKeyboardMarkup::make()
-            ->addRow(
+        $keyboard = InlineKeyboardMarkup::make();
+
+        foreach ($channels as $channel) {
+            $keyboard->addRow(
                 InlineKeyboardButton::make(
-                    text: "🔄 Yangilash",
-                    callback_data: "refresh_stats"
+                    text: "➡️ @{$channel['username']}",
+                    url: "https://t.me/{$channel['username']}"
                 )
             );
+        }
+
+        $keyboard->addRow(
+            InlineKeyboardButton::make(
+                text: "✅ Tekshirish",
+                callback_data: "check_subscription"
+            )
+        );
+
+        return $keyboard;
+    }
+
+    public static function categorySelector(array $categories, array $selectedIds = []): InlineKeyboardMarkup
+    {
+        $keyboard = InlineKeyboardMarkup::make();
+
+        foreach ($categories as $category) {
+            $isSelected = in_array($category['id'], $selectedIds);
+            $prefix = $isSelected ? "✅ " : "";
+
+            $keyboard->addRow(
+                InlineKeyboardButton::make(
+                    text: "{$prefix}{$category['name']}",
+                    callback_data: "select_category_{$category['id']}"
+                )
+            );
+        }
+
+        $keyboard->addRow(
+            InlineKeyboardButton::make(
+                text: "✅ Saqlash",
+                callback_data: "save_categories"
+            ),
+            InlineKeyboardButton::make(
+                text: "🚫 Bekor qilish",
+                callback_data: "cancel_select_categories"
+            )
+        );
+
+        return $keyboard;
     }
 
     public static function getUrlButton(string $text, string $url): InlineKeyboardButton
@@ -323,5 +475,16 @@ class Keyboard
     public static function getCallbackButton(string $text, string $callbackData): InlineKeyboardButton
     {
         return InlineKeyboardButton::make(text: $text, callback_data: $callbackData);
+    }
+
+    public static function getInlineKeyboard(array $buttons): InlineKeyboardMarkup
+    {
+        $keyboard = InlineKeyboardMarkup::make();
+
+        foreach ($buttons as $row) {
+            $keyboard->addRow(...$row);
+        }
+
+        return $keyboard;
     }
 }

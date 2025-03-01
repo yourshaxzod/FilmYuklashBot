@@ -6,38 +6,38 @@ class Formatter
 {
     public static function errorMessage(string $error): string
     {
-        return "🚫: {$error}";
+        return "🚫 {$error}";
     }
 
     public static function successMessage(string $message): string
     {
-        return "✅: {$message}";
+        return "✅ {$message}";
     }
 
-    public static function formatFileSize(int $bytes): string
+    public static function formatFileSize(int $bytes, int $precision = 2): string
     {
-        $units = ['B', 'KB', 'MB', 'GB'];
+        $units = ['B', 'KB', 'MB', 'GB', 'TB'];
         $bytes = max($bytes, 0);
         $pow = floor(($bytes ? log($bytes) : 0) / log(1024));
         $pow = min($pow, count($units) - 1);
         $bytes /= pow(1024, $pow);
 
-        return round($bytes, 2) . ' ' . $units[$pow];
+        return round($bytes, $precision) . ' ' . $units[$pow];
     }
 
-    public static function formatNumber($number)
+    public static function formatNumber($number, int $precision = 1): string
     {
         if ($number < 1000) {
             return number_format($number);
         } elseif ($number < 1000000) {
             $formatted = $number / 1000;
-            return round($formatted, 1) . 'K';
+            return round($formatted, $precision) . 'K';
         } elseif ($number < 1000000000) {
             $formatted = $number / 1000000;
-            return round($formatted, 1) . 'M';
+            return round($formatted, $precision) . 'M';
         } else {
             $formatted = $number / 1000000000;
-            return round($formatted, 1) . 'B';
+            return round($formatted, $precision) . 'B';
         }
     }
 
@@ -80,9 +80,17 @@ class Formatter
         return mb_substr($text, 0, $length) . '...';
     }
 
-    public static function isNumericString($str)
+    public static function escapeHTML(string $text): string
     {
-        return ctype_digit($str);
+        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
+    }
+
+    public static function isNumericString($str): bool
+    {
+        if ($str === null || $str === '') {
+            return false;
+        }
+        return ctype_digit((string)$str);
     }
 
     public static function stringToInteger($str)
@@ -91,5 +99,29 @@ class Formatter
             return intval($str);
         }
         return false;
+    }
+
+    public static function formatRating(float $rating): string
+    {
+        $rating = min(5, max(0, $rating));
+        $fullStars = floor($rating);
+        $halfStar = round($rating - $fullStars, 1) >= 0.5;
+        $emptyStars = 5 - $fullStars - ($halfStar ? 1 : 0);
+
+        $stars = str_repeat('⭐️', $fullStars);
+        $stars .= $halfStar ? '✨' : '';
+        $stars .= str_repeat('☆', $emptyStars);
+
+        return $stars . " ({$rating})";
+    }
+
+    public static function formatCategories(array $categories): string
+    {
+        if (empty($categories)) {
+            return "Kategoriya belgilanmagan";
+        }
+
+        $categoryNames = array_column($categories, 'name');
+        return '#' . implode(' #', $categoryNames);
     }
 }

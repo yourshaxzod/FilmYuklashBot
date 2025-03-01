@@ -9,10 +9,10 @@ function connectDatabase(): PDO
     try {
         Config::load();
 
-        $required = ['DB_HOST', 'DB_NAME', 'DB_USER'];
-        foreach ($required as $key) {
-            if (empty(Config::get($key))) {
-                throw new \PDOException("Bazaga ulanish uchun malumot yo'q: {$key}");
+        $requiredParams = ['DB_HOST', 'DB_NAME', 'DB_USER'];
+        foreach ($requiredParams as $param) {
+            if (empty(Config::get($param))) {
+                throw new \PDOException("Bazaga ulanish uchun ma'lumot yo'q: {$param}");
             }
         }
 

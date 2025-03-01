@@ -3,9 +3,9 @@
 namespace App\Handlers;
 
 use SergiX44\Nutgram\Nutgram;
-use App\Services\{MovieService, ChannelService, StatisticsService};
-use App\Models\{Movie, Video};
-use App\Helpers\{Menu, State, Validator, Formatter, Keyboard};
+use App\Services\{MovieService, CategoryService, ChannelService, StatisticsService, VideoService};
+use App\Models\{Movie, Video, Category, Channel, User};
+use App\Helpers\{Menu, State, Validator, Formatter, Keyboard, Text};
 use PDO;
 
 class MessageHandler
@@ -15,17 +15,18 @@ class MessageHandler
         $bot->onMessage(function (Nutgram $bot) use ($db) {
             $message = $bot->message();
 
-            if (!$message->text) {
+            if (!isset($message->text)) {
                 return;
             }
 
             $state = State::getState($bot);
+            var_dump($state);
             if (!$state) {
                 return;
             }
 
-            if ($message->text === "↩️ Ortga qaytish") {
-                State::clearState($bot);
+            if ($message->text === "↩️ Orqaga" || $message->text === "🚫 Bekor qilish") {
+                State::clearAll($bot);
                 Menu::showMainMenu($bot);
                 return;
             }
@@ -39,6 +40,10 @@ class MessageHandler
             }
 
             if (self::handleVideoStates($bot, $db, $state, $message->text)) {
+                return;
+            }
+
+            if (self::handleCategoryStates($bot, $db, $state, $message->text)) {
                 return;
             }
 
@@ -61,8 +66,8 @@ class MessageHandler
                     return true;
                 }
 
-                State::setState($bot, 'movie_title', $text);
-                State::setState($bot, 'state', 'add_movie_year');
+                State::set($bot, 'movie_title', $text);
+                State::set($bot, 'state', 'add_movie_year');
 
                 $bot->sendMessage("📅 Endi kino yilini kiriting (masalan: 2023):");
                 return true;
@@ -75,20 +80,20 @@ class MessageHandler
                     return true;
                 }
 
-                State::setState($bot, 'movie_year', $year);
-                State::setState($bot, 'state', 'add_movie_description');
+                State::set($bot, 'movie_year', $year);
+                State::set($bot, 'state', 'add_movie_description');
 
                 $bot->sendMessage("📝 Endi kino haqida tavsif kiriting:");
                 return true;
 
             case 'add_movie_description':
                 if (!Validator::validateMovieDescription($text)) {
-                    $bot->sendMessage("⚠️ Noto'g'ri tavsif! Kamida 10 ta, ko'pi bilan 1000 ta belgi bo'lishi kerak.");
+                    $bot->sendMessage("⚠️ Noto'g'ri tavsif! Kamida 10 ta, ko'pi bilan 4000 ta belgi bo'lishi kerak.");
                     return true;
                 }
 
-                State::setState($bot, 'movie_description', $text);
-                State::setState($bot, 'state', 'add_movie_photo');
+                State::set($bot, 'movie_description', $text);
+                State::set($bot, 'state', 'add_movie_photo');
 
                 $bot->sendMessage("🖼 Endi kino posterini (rasm) yuboring:");
                 return true;
@@ -97,34 +102,38 @@ class MessageHandler
                 if ($text === "✅ Tasdiqlash") {
                     try {
                         $movieData = [
-                            'title' => $bot->getUserData('movie_title'),
-                            'description' => $bot->getUserData('movie_description'),
-                            'year' => $bot->getUserData('movie_year'),
-                            'file_id' => $bot->getUserData('movie_photo')
+                            'title' => State::get($bot, 'movie_title'),
+                            'description' => State::get($bot, 'movie_description'),
+                            'year' => State::get($bot, 'movie_year'),
+                            'file_id' => State::get($bot, 'movie_photo')
                         ];
 
-                        $movieId = Movie::create($db, $movieData);
+                        $categoryIds = State::get($bot, 'selected_categories') ?? [];
+
+                        $movieId = Movie::create($db, $movieData, $categoryIds);
 
                         $bot->sendMessage(
                             text: "✅ Kino muvaffaqiyatli qo'shildi! ID: {$movieId}\n\nEndi kinoga video qo'shish uchun video yuboring:",
-                            reply_markup: Keyboard::MainMenu($bot)
+                            reply_markup: Keyboard::cancel()
                         );
 
-                        State::setState($bot, 'state', 'add_video');
-                        State::setState($bot, 'movie_id', (string)$movieId);
+                        State::set($bot, 'state', 'add_video');
+                        State::set($bot, 'movie_id', (string)$movieId);
+
+                        State::clear($bot, ['movie_title', 'movie_description', 'movie_year', 'movie_photo', 'selected_categories']);
                     } catch (\Exception $e) {
                         $bot->sendMessage(
                             text: "⚠️ Kino qo'shishda xatolik: " . $e->getMessage(),
-                            reply_markup: Keyboard::MainMenu($bot)
+                            reply_markup: Keyboard::mainMenu($bot)
                         );
-                        State::clearState($bot);
+                        State::clearAll($bot);
                     }
                 } else if ($text === "🚫 Bekor qilish") {
                     $bot->sendMessage(
                         text: "❌ Kino qo'shish bekor qilindi.",
-                        reply_markup: Keyboard::MainMenu($bot)
+                        reply_markup: Keyboard::mainMenu($bot)
                     );
-                    State::clearState($bot);
+                    State::clearAll($bot);
                 }
                 return true;
 
@@ -135,25 +144,120 @@ class MessageHandler
                 }
 
                 $movieId = (int)$text;
-                $movie = Movie::find($db, $movieId);
+                $movie = Movie::findById($db, $movieId);
 
                 if (!$movie) {
                     $bot->sendMessage("⚠️ Bu ID bilan kino topilmadi!");
                     return true;
                 }
 
-                State::setState($bot, 'edit_movie_id', (string)$movieId);
+                $categories = Category::getByMovieId($db, $movieId);
 
                 $bot->sendPhoto(
                     photo: $movie['file_id'] ?? 'https://via.placeholder.com/400x600?text=No+Image',
-                    caption: "🎬 <b>" . $movie['title'] . "</b>\n\n" .
-                        "🆔 <b>ID:</b> " . $movie['id'] . "\n" .
-                        "📝 <b>Tavsif:</b> " . $movie['description'] . "\n" .
-                        "📅 <b>Yil:</b> " . $movie['year'] . "\n\n" .
-                        "Nimani tahrirlash kerak?",
+                    caption: Text::movieInfo($movie, $movie['video_count'], $categories, true),
                     parse_mode: 'HTML',
-                    reply_markup: Keyboard::MovieEditActions($movieId)
+                    reply_markup: Keyboard::movieEditActions($movieId)
                 );
+
+                State::clearAll($bot);
+
+                return true;
+
+            case (preg_match('/^edit_movie_title_(\d+)$/', $state, $matches) ? true : false):
+                $movieId = (int)$matches[1];
+
+                if (!Validator::validateMovieTitle($text)) {
+                    $bot->sendMessage("⚠️ Noto'g'ri kino nomi! Kamida 2 ta, ko'pi bilan 255 ta belgi bo'lishi kerak.");
+                    return true;
+                }
+
+                try {
+                    Movie::update($db, $movieId, ['title' => $text]);
+
+                    $bot->sendMessage("✅ Kino nomi muvaffaqiyatli yangilandi!");
+
+                    MovieService::showMovie($bot, $db, $movieId);
+
+                    State::clearAll($bot);
+                } catch (\Exception $e) {
+                    $bot->sendMessage("⚠️ Kino nomini yangilashda xatolik: " . $e->getMessage());
+                }
+
+                return true;
+
+            case (preg_match('/^edit_movie_year_(\d+)$/', $state, $matches) ? true : false):
+                $movieId = (int)$matches[1];
+                $year = (int)$text;
+
+                if (!Validator::validateMovieYear($year)) {
+                    $bot->sendMessage("⚠️ Noto'g'ri yil! 1900 dan hozirgi yilgacha bo'lgan son kiriting:");
+                    return true;
+                }
+
+                try {
+                    Movie::update($db, $movieId, ['year' => $year]);
+
+                    $bot->sendMessage("✅ Kino yili muvaffaqiyatli yangilandi!");
+
+                    MovieService::showMovie($bot, $db, $movieId);
+
+                    State::clearAll($bot);
+                } catch (\Exception $e) {
+                    $bot->sendMessage("⚠️ Kino yilini yangilashda xatolik: " . $e->getMessage());
+                }
+
+                return true;
+
+            case (preg_match('/^edit_movie_description_(\d+)$/', $state, $matches) ? true : false):
+                $movieId = (int)$matches[1];
+
+                if (!Validator::validateMovieDescription($text)) {
+                    $bot->sendMessage("⚠️ Noto'g'ri tavsif! Kamida 10 ta, ko'pi bilan 4000 ta belgi bo'lishi kerak.");
+                    return true;
+                }
+
+                try {
+                    Movie::update($db, $movieId, ['description' => $text]);
+
+                    $bot->sendMessage("✅ Kino tavsifi muvaffaqiyatli yangilandi!");
+
+                    MovieService::showMovie($bot, $db, $movieId);
+
+                    State::clearAll($bot);
+                } catch (\Exception $e) {
+                    $bot->sendMessage("⚠️ Kino tavsifini yangilashda xatolik: " . $e->getMessage());
+                }
+
+                return true;
+
+            case 'delete_movie_id':
+                if (!is_numeric($text)) {
+                    $bot->sendMessage("⚠️ Kino ID raqam bo'lishi kerak!");
+                    return true;
+                }
+
+                $movieId = (int)$text;
+                $movie = Movie::findById($db, $movieId);
+
+                if (!$movie) {
+                    $bot->sendMessage("⚠️ Bu ID bilan kino topilmadi!");
+                    return true;
+                }
+
+                $categories = Category::getByMovieId($db, $movieId);
+
+                $message = "🗑 <b>Kinoni o'chirish</b>\n\n";
+                $message .= Text::movieInfo($movie, $movie['video_count'], $categories);
+                $message .= "\n\nKinoni o'chirishni tasdiqlaysizmi?";
+
+                $bot->sendMessage(
+                    text: $message,
+                    parse_mode: 'HTML',
+                    reply_markup: Keyboard::confirmDelete('movie', $movieId)
+                );
+
+                State::clearAll($bot);
 
                 return true;
         }
@@ -170,10 +274,10 @@ class MessageHandler
                     return true;
                 }
 
-                State::setState($bot, 'video_title', $text);
-                State::setState($bot, 'state', 'add_video_part');
+                State::set($bot, 'video_title', $text);
+                State::set($bot, 'state', 'add_video_part');
 
-                $movieId = $bot->getUserData('movie_id');
+                $movieId = State::get($bot, 'movie_id');
                 $nextPart = Video::getNextPartNumber($db, (int)$movieId);
 
                 $bot->sendMessage("🔢 Endi video qism raqamini kiriting (masalan: {$nextPart}):");
@@ -186,7 +290,7 @@ class MessageHandler
                 }
 
                 $partNumber = (int)$text;
-                $movieId = $bot->getUserData('movie_id');
+                $movieId = State::get($bot, 'movie_id');
 
                 try {
                     $existing = Video::findByPart($db, (int)$movieId, $partNumber);
@@ -197,58 +301,188 @@ class MessageHandler
                 } catch (\Exception $e) {
                 }
 
-                State::setState($bot, 'video_part', (string)$partNumber);
+                State::set($bot, 'video_part', (string)$partNumber);
 
-                $videoFileId = $bot->getUserData('file_id');
-                $videoDuration = $bot->getUserData('video_duration');
-                $videoFileSize = $bot->getUserData('video_file_size');
-                $videoTitle = $bot->getUserData('video_title');
+                $videoFileId = State::get($bot, 'file_id');
 
                 if ($videoFileId) {
-                    try {
-                        $videoData = [
-                            'movie_id' => (int)$movieId,
-                            'title' => $videoTitle,
-                            'part_number' => $partNumber,
-                            'file_id' => $videoFileId,
-                            'duration' => $videoDuration,
-                            'file_size' => $videoFileSize
-                        ];
-
-                        $videoId = Video::create($db, $videoData);
-
-                        $formattedSize = Formatter::formatFileSize($videoFileSize);
-                        $formattedDuration = Formatter::formatDuration($videoDuration);
-
-                        $movie = Movie::find($db, (int)$movieId);
-
-                        $bot->sendMessage(
-                            text: "✅ Video muvaffaqiyatli qo'shildi!\n\n" .
-                                "🎬 <b>Kino:</b> {$movie['title']}\n" .
-                                "📹 <b>Video:</b> {$videoTitle}\n" .
-                                "🔢 <b>Qism:</b> {$partNumber}\n" .
-                                "⏱ <b>Davomiyligi:</b> {$formattedDuration}\n" .
-                                "📦 <b>Hajmi:</b> {$formattedSize}\n\n" .
-                                "Yana video qo'shish uchun video yuboring yoki bosh menyuga qaytish uchun /start buyrug'ini bosing.",
-                            parse_mode: 'HTML',
-                            reply_markup: Keyboard::MainMenu($bot)
-                        );
-
-                        State::setState($bot, 'state', 'add_video');
-                        State::setState($bot, 'video_title', null);
-                        State::setState($bot, 'video_part', null);
-                        State::setState($bot, 'file_id', null);
-                        State::setState($bot, 'video_duration', null);
-                        State::setState($bot, 'video_file_size', null);
-                    } catch (\Exception $e) {
-                        $bot->sendMessage(
-                            text: "⚠️ Video qo'shishda xatolik: " . $e->getMessage(),
-                            reply_markup: Keyboard::Cancel()
-                        );
-                    }
+                    self::processStoredVideo($bot, $db);
                 } else {
                     $bot->sendMessage("📹 Endi videoni yuboring:");
-                    State::setState($bot, 'state', 'add_video');
+                    State::set($bot, 'state', 'add_video');
+                }
+
+                return true;
+
+            case (preg_match('/^edit_video_title_(\d+)$/', $state, $matches) ? true : false):
+                $videoId = (int)$matches[1];
+
+                if (!Validator::validateVideoTitle($text)) {
+                    $bot->sendMessage("⚠️ Noto'g'ri video sarlavhasi! Kamida 2 ta, ko'pi bilan 255 ta belgi bo'lishi kerak.");
+                    return true;
+                }
+
+                try {
+                    Video::update($db, $videoId, ['title' => $text]);
+
+                    $video = Video::findById($db, $videoId);
+                    if (!$video) {
+                        throw new \Exception("Video topilmadi");
+                    }
+
+                    $bot->sendMessage("✅ Video sarlavhasi muvaffaqiyatli yangilandi!");
+
+                    VideoService::showVideos($bot, $db, $video['movie_id'], 1, true);
+
+                    State::clearAll($bot);
+                } catch (\Exception $e) {
+                    $bot->sendMessage("⚠️ Video sarlavhasini yangilashda xatolik: " . $e->getMessage());
+                }
+
+                return true;
+
+            case (preg_match('/^edit_video_part_(\d+)$/', $state, $matches) ? true : false):
+                $videoId = (int)$matches[1];
+
+                if (!Validator::validateVideoPartNumber($text)) {
+                    $bot->sendMessage("⚠️ Noto'g'ri qism raqami! 1 dan 1000 gacha son bo'lishi kerak.");
+                    return true;
+                }
+
+                $partNumber = (int)$text;
+
+                try {
+                    $video = Video::findById($db, $videoId);
+                    if (!$video) {
+                        throw new \Exception("Video topilmadi");
+                    }
+
+                    $existing = Video::findByPart($db, $video['movie_id'], $partNumber);
+                    if ($existing && $existing['id'] != $videoId) {
+                        $bot->sendMessage("⚠️ Bu qism raqami allaqachon mavjud. Boshqa raqam kiriting:");
+                        return true;
+                    }
+
+                    Video::update($db, $videoId, ['part_number' => $partNumber]);
+
+                    $bot->sendMessage("✅ Video qism raqami muvaffaqiyatli yangilandi!");
+
+                    VideoService::showVideos($bot, $db, $video['movie_id'], 1, true);
+
+                    State::clearAll($bot);
+                } catch (\Exception $e) {
+                    $bot->sendMessage("⚠️ Video qism raqamini yangilashda xatolik: " . $e->getMessage());
+                }
+
+                return true;
+        }
+
+        return false;
+    }
+
+    private static function handleCategoryStates(Nutgram $bot, PDO $db, string $state, string $text): bool
+    {
+        switch ($state) {
+            case 'add_category_name':
+                if (!Validator::validateCategoryName($text)) {
+                    $bot->sendMessage("⚠️ Noto'g'ri kategoriya nomi! Kamida 2 ta, ko'pi bilan 100 ta belgi bo'lishi kerak.");
+                    return true;
+                }
+
+                $existing = Category::findByName($db, $text);
+                if ($existing) {
+                    $bot->sendMessage("⚠️ Bu nomdagi kategoriya allaqachon mavjud. Boshqa nom kiriting:");
+                    return true;
+                }
+
+                State::set($bot, 'category_name', $text);
+                State::set($bot, 'state', 'add_category_description');
+
+                $bot->sendMessage("📝 Endi kategoriya haqida tavsif kiriting (ixtiyoriy, o'tkazib yuborish uchun '-' kiriting):");
+                return true;
+
+            case 'add_category_description':
+                $description = ($text === '-') ? null : $text;
+
+                if ($description !== null && mb_strlen($description) > 1000) {
+                    $bot->sendMessage("⚠️ Tavsif juda uzun! Ko'pi bilan 1000 ta belgi bo'lishi kerak.");
+                    return true;
+                }
+
+                try {
+                    $categoryData = [
+                        'name' => State::get($bot, 'category_name'),
+                        'description' => $description
+                    ];
+
+                    $categoryId = Category::create($db, $categoryData);
+
+                    $bot->sendMessage(
+                        text: "✅ Kategoriya muvaffaqiyatli qo'shildi! ID: {$categoryId}",
+                        reply_markup: Keyboard::mainMenu($bot)
+                    );
+
+                    CategoryService::showCategoryList($bot, $db, true);
+
+                    State::clearAll($bot);
+                } catch (\Exception $e) {
+                    $bot->sendMessage(
+                        text: "⚠️ Kategoriya qo'shishda xatolik: " . $e->getMessage(),
+                        reply_markup: Keyboard::mainMenu($bot)
+                    );
+                    State::clearAll($bot);
+                }
+
+                return true;
+
+            case (preg_match('/^edit_category_name_(\d+)$/', $state, $matches) ? true : false):
+                $categoryId = (int)$matches[1];
+
+                if (!Validator::validateCategoryName($text)) {
+                    $bot->sendMessage("⚠️ Noto'g'ri kategoriya nomi! Kamida 2 ta, ko'pi bilan 100 ta belgi bo'lishi kerak.");
+                    return true;
+                }
+
+                $existing = Category::findByName($db, $text);
+                if ($existing && $existing['id'] != $categoryId) {
+                    $bot->sendMessage("⚠️ Bu nomdagi kategoriya allaqachon mavjud. Boshqa nom kiriting:");
+                    return true;
+                }
+
+                try {
+                    Category::update($db, $categoryId, ['name' => $text]);
+
+                    $bot->sendMessage("✅ Kategoriya nomi muvaffaqiyatli yangilandi!");
+
+                    CategoryService::showCategoryList($bot, $db, true);
+
+                    State::clearAll($bot);
+                } catch (\Exception $e) {
+                    $bot->sendMessage("⚠️ Kategoriya nomini yangilashda xatolik: " . $e->getMessage());
+                }
+
+                return true;
+
+            case (preg_match('/^edit_category_description_(\d+)$/', $state, $matches) ? true : false):
+                $categoryId = (int)$matches[1];
+
+                $description = ($text === '-') ? null : $text;
+
+                if ($description !== null && mb_strlen($description) > 1000) {
+                    $bot->sendMessage("⚠️ Tavsif juda uzun! Ko'pi bilan 1000 ta belgi bo'lishi kerak.");
+                    return true;
+                }
+
+                try {
+                    Category::update($db, $categoryId, ['description' => $description]);
+
+                    $bot->sendMessage("✅ Kategoriya tavsifi muvaffaqiyatli yangilandi!");
+
+                    CategoryService::showCategoryList($bot, $db, true);
+
+                    State::clearAll($bot);
+                } catch (\Exception $e) {
+                    $bot->sendMessage("⚠️ Kategoriya tavsifini yangilashda xatolik: " . $e->getMessage());
                 }
 
                 return true;
@@ -264,10 +498,14 @@ class MessageHandler
         }
 
         switch ($state) {
-            case 'panel':
+            case 'admin_panel':
                 switch ($text) {
                     case '🎬 Kinolar':
                         Menu::showMovieManageMenu($bot);
+                        return true;
+
+                    case '🏷 Kategoriyalar':
+                        CategoryService::showCategoryList($bot, $db, true);
                         return true;
 
                     case '🔐 Kanallar':
@@ -278,13 +516,22 @@ class MessageHandler
                         StatisticsService::showStats($bot, $db);
                         return true;
 
-                    case '📬 Habarlar':
-                        State::setState($bot, 'state', 'broadcast_message');
+                    case '📬 Xabarlar':
+                        State::set($bot, 'state', 'broadcast_message');
                         $bot->sendMessage(
                             text: "📬 <b>Foydalanuvchilarga xabar yuborish</b>\n\n" .
                                 "Yubormoqchi bo'lgan xabarni kiriting:",
                             parse_mode: 'HTML',
-                            reply_markup: Keyboard::Cancel()
+                            reply_markup: Keyboard::cancel()
+                        );
+                        return true;
+
+                    case '⚙️ Sozlamalar':
+                        $bot->sendMessage(
+                            text: "⚙️ <b>Bot sozlamalari</b>\n\n" .
+                                "Bu bo'lim ishlab chiqilmoqda.",
+                            parse_mode: 'HTML',
+                            reply_markup: Keyboard::adminMenu()
                         );
                         return true;
                 }
@@ -296,19 +543,19 @@ class MessageHandler
                     return true;
                 }
 
-                State::setState($bot, 'broadcast_text', $text);
-                State::setState($bot, 'state', 'broadcast_confirm');
+                State::set($bot, 'broadcast_text', $text);
+                State::set($bot, 'state', 'broadcast_confirm');
 
                 $bot->sendMessage(
                     text: "📬 <b>Quyidagi xabarni yuborishni tasdiqlaysizmi?</b>\n\n" . $text,
                     parse_mode: 'HTML',
-                    reply_markup: Keyboard::Confirm()
+                    reply_markup: Keyboard::confirm()
                 );
                 return true;
 
             case 'broadcast_confirm':
                 if ($text === "✅ Tasdiqlash") {
-                    $broadcastText = $bot->getUserData('broadcast_text');
+                    $broadcastText = State::get($bot, 'broadcast_text');
 
                     if (empty($broadcastText)) {
                         $bot->sendMessage("⚠️ Xabar topilmadi!");
@@ -317,54 +564,44 @@ class MessageHandler
                     }
 
                     try {
-                        $stmt = $db->query("SELECT user_id FROM users WHERE status = 'active'");
-                        $users = $stmt->fetchAll(PDO::FETCH_COLUMN);
+                        $users = User::getAll($db, 'active', 1000);
+                        $userIds = array_column($users, 'user_id');
 
                         $bot->sendMessage(
                             text: "📬 <b>Xabar yuborilmoqda...</b>\n\n" .
-                                "Jami foydalanuvchilar: " . count($users),
+                                "Jami foydalanuvchilar: " . count($userIds),
                             parse_mode: 'HTML'
                         );
 
-                        $sent = 0;
-                        $failed = 0;
+                        $options = [
+                            'parse_mode' => 'HTML',
+                            'disable_web_page_preview' => true
+                        ];
 
-                        foreach ($users as $userId) {
-                            try {
-                                $bot->sendMessage(
-                                    chat_id: $userId,
-                                    text: $broadcastText,
-                                    parse_mode: 'HTML'
-                                );
-                                $sent++;
-                            } catch (\Exception $e) {
-                                $failed++;
-                            }
-
-                            usleep(50000); // 0.05 seconds
-                        }
+                        $results = User::broadcast($bot, $db, $broadcastText, $options);
 
                         $bot->sendMessage(
                             text: "✅ <b>Xabar yuborildi!</b>\n\n" .
-                                "✅ Yuborildi: {$sent}\n" .
-                                "❌ Yuborilmadi: {$failed}",
+                                "✅ Yuborildi: {$results['sent']}\n" .
+                                "❌ Yuborilmadi: {$results['failed']}\n" .
+                                "⚠️ O'tkazib yuborildi: {$results['skipped']}",
                             parse_mode: 'HTML',
-                            reply_markup: Keyboard::MainMenu($bot)
+                            reply_markup: Keyboard::adminMenu()
                         );
                     } catch (\Exception $e) {
                         $bot->sendMessage(
                             text: "⚠️ Xabar yuborishda xatolik: " . $e->getMessage(),
-                            reply_markup: Keyboard::MainMenu($bot)
+                            reply_markup: Keyboard::adminMenu()
                         );
                     }
 
-                    State::clearState($bot);
+                    State::clearAll($bot);
                 } else if ($text === "🚫 Bekor qilish") {
                     $bot->sendMessage(
                         text: "❌ Xabar yuborish bekor qilindi.",
-                        reply_markup: Keyboard::MainMenu($bot)
+                        reply_markup: Keyboard::adminMenu()
                     );
-                    State::clearState($bot);
+                    State::clearAll($bot);
                 }
                 return true;
         }
@@ -385,7 +622,46 @@ class MessageHandler
                     return true;
                 }
 
-                ChannelService::addChannel($bot, $db, $text);
+                try {
+                    $channelInfo = Channel::checkBotIsAdmin($bot, $text);
+
+                    if (!$channelInfo) {
+                        $bot->sendMessage(
+                            text: "⚠️ <b>Xatolik:</b> Kanal topilmadi yoki bot admin emas. Iltimos tekshiring va qayta urinib ko'ring.",
+                            parse_mode: 'HTML'
+                        );
+                        return true;
+                    }
+
+                    $existing = Channel::findByUsername($db, $channelInfo['username']);
+                    if ($existing) {
+                        $bot->sendMessage(
+                            text: "⚠️ <b>Xatolik:</b> Bu kanal allaqachon qo'shilgan.",
+                            parse_mode: 'HTML'
+                        );
+                        return true;
+                    }
+
+                    $channelId = Channel::create($db, $channelInfo);
+
+                    $bot->sendMessage(
+                        text: "✅ <b>Kanal muvaffaqiyatli qo'shildi!</b>\n\n" .
+                            "📢 <b>Kanal:</b> @{$channelInfo['username']}\n" .
+                            "💬 <b>Nomi:</b> {$channelInfo['title']}",
+                        parse_mode: 'HTML',
+                        reply_markup: Keyboard::adminMenu()
+                    );
+
+                    ChannelService::showChannels($bot, $db);
+
+                    State::clearAll($bot);
+                } catch (\Exception $e) {
+                    $bot->sendMessage(
+                        text: "⚠️ <b>Xatolik:</b> " . $e->getMessage(),
+                        parse_mode: 'HTML'
+                    );
+                }
+
                 return true;
 
             case 'delete_channel':
@@ -399,10 +675,87 @@ class MessageHandler
                     return true;
                 }
 
-                ChannelService::deleteChannel($bot, $db, (int)$text);
+                $channelId = (int)$text;
+
+                try {
+                    $channel = Channel::find($db, $channelId);
+                    if (!$channel) {
+                        $bot->sendMessage("⚠️ Bu ID bilan kanal topilmadi!");
+                        return true;
+                    }
+
+                    Channel::delete($db, $channelId);
+
+                    $bot->sendMessage(
+                        text: "✅ <b>Kanal muvaffaqiyatli o'chirildi!</b>",
+                        parse_mode: 'HTML',
+                        reply_markup: Keyboard::adminMenu()
+                    );
+
+                    ChannelService::showChannels($bot, $db);
+
+                    State::clearAll($bot);
+                } catch (\Exception $e) {
+                    $bot->sendMessage(
+                        text: "⚠️ <b>Xatolik:</b> " . $e->getMessage(),
+                        parse_mode: 'HTML'
+                    );
+                }
+
                 return true;
         }
 
         return false;
+    }
+
+    private static function processStoredVideo(Nutgram $bot, PDO $db): void
+    {
+        try {
+            $movieId = (int)State::get($bot, 'movie_id');
+            $movie = Movie::findById($db, $movieId);
+
+            if (!$movie) {
+                $bot->sendMessage(text: "⚠️ Kino topilmadi.");
+                return;
+            }
+
+            $videoTitle = State::get($bot, 'video_title');
+            $partNumber = (int)State::get($bot, 'video_part');
+            $fileId = State::get($bot, 'file_id');
+
+            if (empty($videoTitle) || empty($fileId)) {
+                $bot->sendMessage(text: "⚠️ Video ma'lumotlari to'liq emas.");
+                return;
+            }
+
+            $videoData = [
+                'movie_id' => $movieId,
+                'title' => $videoTitle,
+                'part_number' => $partNumber,
+                'file_id' => $fileId
+            ];
+
+            $videoId = Video::create($db, $videoData);
+
+            $message = "✅ Video muvaffaqiyatli qo'shildi!\n\n" .
+                "🎬 <b>Kino:</b> {$movie['title']}\n" .
+                "📹 <b>Video:</b> {$videoTitle}\n" .
+                "🔢 <b>Qism:</b> {$partNumber}\n\n" .
+                "Yana video qo'shish uchun video yuboring yoki bosh menyuga qaytish uchun /start buyrug'ini bosing.";
+
+            $bot->sendMessage(
+                text: $message,
+                parse_mode: 'HTML',
+                reply_markup: Keyboard::cancel()
+            );
+
+            State::set($bot, 'state', 'add_video');
+            State::clear($bot, ['video_title', 'video_part', 'file_id']);
+        } catch (\Exception $e) {
+            $bot->sendMessage(
+                text: "⚠️ Video qo'shishda xatolik: " . $e->getMessage(),
+                reply_markup: Keyboard::cancel()
+            );
+        }
     }
 }
