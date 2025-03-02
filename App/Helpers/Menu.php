@@ -3,6 +3,9 @@
 namespace App\Helpers;
 
 use App\Models\{Movie, Category};
+use App\Services\CategoryService;
+use App\Services\ChannelService;
+use App\Services\StatisticsService;
 use PDO;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Properties\ParseMode;
@@ -13,23 +16,19 @@ class Menu
 {
     public static function showMainMenu(Nutgram $bot): void
     {
+        State::setScreen($bot, State::MAIN);
         self::sendMenu($bot, Text::mainMenu(), Keyboard::mainMenu($bot));
     }
 
     public static function showAdminMenu(Nutgram $bot): void
     {
-        if (!Validator::isAdmin($bot)) {
-            self::showError($bot, Text::noPermission());
-            return;
-        }
-
-        State::set($bot, 'state', 'admin_panel');
+        State::setScreen($bot, State::ADM_MAIN);
         self::sendMenu($bot, Text::adminMenu(), Keyboard::adminMenu());
     }
 
     public static function showSearchMenu(Nutgram $bot): void
     {
-        State::set($bot, 'state', 'search');
+        State::setScreen($bot, State::SEARCH);
         self::sendMenu($bot, Text::searchMenu(), Keyboard::back());
     }
 
@@ -78,7 +77,6 @@ class Menu
         $message = "🔥 <b>Trend kinolar</b> (sahifa {$page}/{$totalPages})\n\n";
         $message .= "Eng ko'p ko'rilgan va yoqtirilgan kinolar:";
 
-        // Sahifalash uchun tugmalar
         $movieButtons = [];
         foreach ($trending as $movie) {
             $movieButtons[] = [Keyboard::getCallbackButton("🎬 {$movie['title']}", "movie_{$movie['id']}")];
@@ -193,31 +191,51 @@ class Menu
 
     public static function showMovieManageMenu(Nutgram $bot): void
     {
-        if (!Validator::isAdmin($bot)) {
-            self::showError($bot, Text::noPermission());
-            return;
-        }
-
         self::sendMenu($bot, Text::movieManage(), Keyboard::movieManageMenu());
     }
 
-    public static function showCategoryManageMenu(Nutgram $bot): void
+    public static function showCategoryManageMenu(Nutgram $bot, PDO $db): void
     {
-        if (!Validator::isAdmin($bot)) {
-            self::showError($bot, Text::noPermission());
-            return;
-        }
+        CategoryService::showCategoryList($bot, $db, true);
+    }
 
-        self::sendMenu($bot, Text::categoryManage(), Keyboard::categoryManageMenu());
+    public static function showChannelManageMenu(Nutgram $bot, PDO $db): void
+    {
+        ChannelService::showChannels($bot, $db);
+    }
+
+    public static function showStatisticManageMenu(Nutgram $bot, PDO $db): void
+    {
+        StatisticsService::showStats($bot, $db);
+    }
+
+    public static function showBroadcastMenu(Nutgram $bot): void
+    {
+        State::setScreen($bot, State::ADM_BROADCAST);
+
+        $message = "📣 <b>Foydalanuvchilarga yubormoqchi bo'lgan xabarni kiriting:</b>";
+
+        self::sendMenu($bot, $message, Keyboard::cancel());
     }
 
     public static function showAddMovieGuide(Nutgram $bot): void
     {
+        State::setState($bot, 'add_movie_title');
         self::sendMenu($bot, Text::addMovie(), Keyboard::cancel());
+    }
+
+    public static function showDelMovieMenu(Nutgram $bot): void
+    {
+        State::set($bot, 'state', 'delete_movie_id');
+
+        $message = "🗑 <b>O'chirish uchun kino ID raqamini kiriting:</b>";
+
+        self::sendMenu($bot, $message, Keyboard::cancel());
     }
 
     public static function showEditMovieGuide(Nutgram $bot): void
     {
+        State::setState($bot, 'edit_movie_id');
         self::sendMenu($bot, Text::editMovie(), Keyboard::movieManageMenu());
     }
 

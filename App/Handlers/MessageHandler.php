@@ -19,9 +19,8 @@ class MessageHandler
                 return;
             }
 
-            $state = State::getState($bot);
-            var_dump($state);
-            if (!$state) {
+            $screen = State::getScreen($bot);
+            if (!$screen) {
                 return;
             }
 
@@ -31,23 +30,23 @@ class MessageHandler
                 return;
             }
 
-            if (self::handleAdminStates($bot, $db, $state, $message->text)) {
+            if (self::handleAdminStates($bot, $db, $screen, $message->text)) {
                 return;
             }
 
-            if (self::handleMovieStates($bot, $db, $state, $message->text)) {
+            if (self::handleMovieStates($bot, $db, $screen, $message->text)) {
                 return;
             }
 
-            if (self::handleVideoStates($bot, $db, $state, $message->text)) {
+            if (self::handleVideoStates($bot, $db, $screen, $message->text)) {
                 return;
             }
 
-            if (self::handleCategoryStates($bot, $db, $state, $message->text)) {
+            if (self::handleCategoryStates($bot, $db, $screen, $message->text)) {
                 return;
             }
 
-            if (self::handleChannelStates($bot, $db, $state, $message->text)) {
+            if (self::handleChannelStates($bot, $db, $screen, $message->text)) {
                 return;
             }
         });

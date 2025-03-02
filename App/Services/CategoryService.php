@@ -8,26 +8,13 @@ use App\Models\{Movie, Category};
 use App\Helpers\{Formatter, Keyboard, Validator, Menu, State, Text, Config};
 use PDO;
 
-/**
- * Service for handling category-related operations
- */
 class CategoryService
 {
-    /**
-     * Show all categories
-     * 
-     * @param Nutgram $bot Bot instance
-     * @param PDO $db Database connection
-     * @param bool $isAdmin Whether this is for admin mode
-     * @return void
-     */
     public static function showCategoryList(Nutgram $bot, PDO $db, bool $isAdmin = false): void
     {
         try {
-            // Get all categories
             $categories = Category::getAll($db);
 
-            // If no categories found
             if (empty($categories)) {
                 $message = "🏷 <b>Kategoriyalar</b>\n\n";
                 $message .= "Hozircha kategoriyalar yo'q.";
@@ -72,15 +59,6 @@ class CategoryService
         }
     }
 
-    /**
-     * Show movies in a category
-     * 
-     * @param Nutgram $bot Bot instance
-     * @param PDO $db Database connection
-     * @param int $categoryId Category ID
-     * @param int $page Page number
-     * @return void
-     */
     public static function showCategoryMovies(Nutgram $bot, PDO $db, int $categoryId, int $page = 1): void
     {
         try {

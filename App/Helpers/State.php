@@ -6,6 +6,26 @@ use SergiX44\Nutgram\Nutgram;
 
 class State
 {
+    public const STATE = 'state';
+    public const SCREEN = 'screen';
+
+    // USER
+    public const MAIN = 'main';
+    public const SEARCH = 'search';
+    public const FAVORITES = 'favorites';
+    public const TRENDING = 'trending';
+    public const CATEGORY = 'category';
+    public const RECOMMENDATIONS = 'recommendations';
+
+    // ADM
+    public const ADM_MAIN = 'adm_main';
+    public const ADM_MOVIE = 'adm_movie';
+    public const ADM_CHANNEL = 'adm_channel';
+    public const ADM_CATEGORY = 'adm_category';
+    public const ADM_BROADCAST = 'adm_broadcast';
+    public const ADM_STATISTIC = 'adm_statistic';
+
+
     public static function get(Nutgram $bot, string $key = 'state'): mixed
     {
         $data = $bot->getUserData('data') ?? [];
@@ -49,6 +69,17 @@ class State
     {
         self::set($bot, 'state', $value);
     }
+
+    public static function getScreen(Nutgram $bot): string
+    {
+        return self::get($bot, self::SCREEN);
+    }
+
+    public static function setScreen(Nutgram $bot, string $screen): void
+    {
+        self::set($bot, self::SCREEN, $screen);
+    }
+
 
     public static function getUserData(Nutgram $bot): array
     {
