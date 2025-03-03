@@ -19,31 +19,59 @@ class MessageHandler
     public static function register(Nutgram $bot, PDO $db): void
     {
         $bot->onMessage(function (Nutgram $bot) use ($db) {
+            $state = State::getState($bot);
             $screen = State::getScreen($bot);
             $text = $bot->message()->text;
 
-            if (!$text || !$screen) {
+            if (!$text) {
                 return;
             }
 
-            switch ($screen) {
-                case State::MAIN:
-                    self::handleMainMenu($bot, $db, $text, $screen);
-                    break;
+            if ($state) {
+                if (self::handleMovieStates($bot, $db, $state, $text)) {
+                    return;
+                }
 
-                case State::ADM_MAIN:
-                    self::handleAdmMainMenu($bot, $db, $text);
-                    break;
+                if (self::handleVideoStates($bot, $db, $state, $text)) {
+                    return;
+                }
+
+                if (self::handleCategoryStates($bot, $db, $state, $text)) {
+                    return;
+                }
+
+                if (self::handleAdminStates($bot, $db, $state, $text)) {
+                    return;
+                }
+
+                if (self::handleChannelStates($bot, $db, $state, $text)) {
+                    return;
+                }
             }
+
+            if ($screen) {
+                switch ($screen) {
+                    case State::MAIN:
+                        self::handleMainScreenButtons($bot, $db, $text);
+                        break;
+
+                    case State::ADM_MAIN:
+                        self::handleAdminScreenButtons($bot, $db, $text);
+                        break;
+
+                    default:
+                        Menu::showMainMenu($bot);
+                        break;
+                }
+                return;
+            }
+
+            Menu::showMainMenu($bot);
         });
     }
 
-    public static function handleMainMenu(
-        Nutgram $bot,
-        PDO $db,
-        string $screen
-    ): void {
-        switch ($screen) {
+    public static function handleMainScreenButtons(Nutgram $bot,PDO $db, string $text): void {
+        switch ($text) {
             case Button::SEARCH:
                 Menu::showSearchMenu($bot);
                 break;
@@ -65,10 +93,9 @@ class MessageHandler
                 break;
 
             case Button::PANEL:
-                if (!Validator::isAdmin($bot)) {
-                    return;
+                if (Validator::isAdmin($bot)) {
+                    Menu::showAdminMenu($bot);
                 }
-                Menu::showAdminMenu($bot);
                 break;
 
             default:
@@ -77,12 +104,14 @@ class MessageHandler
         }
     }
 
-    public static function handleAdmMainMenu(
-        Nutgram $bot,
-        PDO $db,
-        string $text
-    ): void {
+    public static function handleAdminScreenButtons(Nutgram $bot, PDO $db, string $text): void {
+        if (!Validator::isAdmin($bot)) return;
+
         switch ($text) {
+            case Button::BACK:
+                Menu::showMainMenu($bot);
+                break;
+
             case Button::MOVIE:
                 Menu::showMovieManageMenu($bot);
                 break;
@@ -109,29 +138,28 @@ class MessageHandler
         }
     }
 
-    private static function handleMovieStates(
-        Nutgram $bot,
-        PDO $db,
-        string $state,
-        string $text
-    ): bool {
+    private static function handleMovieStates(Nutgram $bot, PDO $db, string $state, string $text): bool {
         switch ($state) {
+            case State::SEARCH:
+                if ($text === Button::BACK) {
+                    Menu::showMainMenu($bot);
+                    return true;
+                }
+                MovieService::search($bot, $db, $text);
+                return true;
+
             case "add_movie_title":
                 State::set($bot, "movie_title", $text);
                 State::setState($bot, "add_movie_year");
 
-                $bot->sendMessage(
-                    "📅 Endi kino yilini kiriting (masalan: 2023):"
-                );
+                $bot->sendMessage("📅 Endi kino yilini kiriting (masalan: 2023):");
                 return true;
 
             case "add_movie_year":
                 $year = (int) $text;
 
                 if (!Validator::validateMovieYear($year)) {
-                    $bot->sendMessage(
-                        "⚠️ Noto'g'ri yil! 1900 dan hozirgi yilgacha bo'lgan son kiriting:"
-                    );
+                    $bot->sendMessage("⚠️ Noto'g'ri yil! 1900 dan hozirgi yilgacha bo'lgan son kiriting:");
                     return true;
                 }
 
@@ -198,6 +226,7 @@ class MessageHandler
                 }
                 return true;
 
+                // Movie edit ID input
             case "edit_movie_id":
                 if (!is_numeric($text)) {
                     $bot->sendMessage("⚠️ Kino ID raqam bo'lishi kerak!");
@@ -228,12 +257,10 @@ class MessageHandler
                 );
 
                 State::clearAll($bot);
-
                 return true;
 
-            case preg_match('/^edit_movie_title_(\d+)$/', $state, $matches)
-                ? true
-                : false:
+                // Movie title edit
+            case (preg_match('/^edit_movie_title_(\d+)$/', $state, $matches) ? true : false):
                 $movieId = (int) $matches[1];
 
                 if (!Validator::validateMovieTitle($text)) {
@@ -262,9 +289,8 @@ class MessageHandler
 
                 return true;
 
-            case preg_match('/^edit_movie_year_(\d+)$/', $state, $matches)
-                ? true
-                : false:
+                // Movie year edit
+            case (preg_match('/^edit_movie_year_(\d+)$/', $state, $matches) ? true : false):
                 $movieId = (int) $matches[1];
                 $year = (int) $text;
 
@@ -294,13 +320,8 @@ class MessageHandler
 
                 return true;
 
-            case preg_match(
-                '/^edit_movie_description_(\d+)$/',
-                $state,
-                $matches
-            )
-                ? true
-                : false:
+                // Movie description edit
+            case (preg_match('/^edit_movie_description_(\d+)$/', $state, $matches) ? true : false):
                 $movieId = (int) $matches[1];
 
                 if (!Validator::validateMovieDescription($text)) {
@@ -360,13 +381,15 @@ class MessageHandler
                 );
 
                 State::clearAll($bot);
-
                 return true;
         }
 
         return false;
     }
 
+    /**
+     * Handle video-related states
+     */
     private static function handleVideoStates(
         Nutgram $bot,
         PDO $db,
@@ -417,6 +440,7 @@ class MessageHandler
                         return true;
                     }
                 } catch (\Exception $e) {
+                    // Continue if there's an error (likely means no existing part)
                 }
 
                 State::set($bot, "video_part", (string) $partNumber);
@@ -432,9 +456,8 @@ class MessageHandler
 
                 return true;
 
-            case preg_match('/^edit_video_title_(\d+)$/', $state, $matches)
-                ? true
-                : false:
+                // Video title edit
+            case (preg_match('/^edit_video_title_(\d+)$/', $state, $matches) ? true : false):
                 $videoId = (int) $matches[1];
 
                 if (!Validator::validateVideoTitle($text)) {
@@ -474,9 +497,8 @@ class MessageHandler
 
                 return true;
 
-            case preg_match('/^edit_video_part_(\d+)$/', $state, $matches)
-                ? true
-                : false:
+                // Video part edit
+            case (preg_match('/^edit_video_part_(\d+)$/', $state, $matches) ? true : false):
                 $videoId = (int) $matches[1];
 
                 if (!Validator::validateVideoPartNumber($text)) {
@@ -536,6 +558,9 @@ class MessageHandler
         return false;
     }
 
+    /**
+     * Handle category-related states
+     */
     private static function handleCategoryStates(
         Nutgram $bot,
         PDO $db,
@@ -604,9 +629,8 @@ class MessageHandler
 
                 return true;
 
-            case preg_match('/^edit_category_name_(\d+)$/', $state, $matches)
-                ? true
-                : false:
+                // Category name edit
+            case (preg_match('/^edit_category_name_(\d+)$/', $state, $matches) ? true : false):
                 $categoryId = (int) $matches[1];
 
                 if (!Validator::validateCategoryName($text)) {
@@ -643,13 +667,8 @@ class MessageHandler
 
                 return true;
 
-            case preg_match(
-                '/^edit_category_description_(\d+)$/',
-                $state,
-                $matches
-            )
-                ? true
-                : false:
+                // Category description edit
+            case (preg_match('/^edit_category_description_(\d+)$/', $state, $matches) ? true : false):
                 $categoryId = (int) $matches[1];
 
                 $description = $text === "-" ? null : $text;
@@ -686,58 +705,15 @@ class MessageHandler
         return false;
     }
 
-    private static function handleAdminStates(
-        Nutgram $bot,
-        PDO $db,
-        string $state,
-        string $text
-    ): bool {
+    private static function handleAdminStates(Nutgram $bot, PDO $db, string $state, string $text): bool
+    {
         if (!Validator::isAdmin($bot)) {
             return false;
         }
 
         switch ($state) {
-            case "admin_panel":
-                switch ($text) {
-                    case "🎬 Kinolar":
-                        Menu::showMovieManageMenu($bot);
-                        return true;
-
-                    case "🏷 Kategoriyalar":
-                        CategoryService::showCategoryList($bot, $db, true);
-                        return true;
-
-                    case "🔐 Kanallar":
-                        ChannelService::showChannels($bot, $db);
-                        return true;
-
-                    case "📊 Statistika":
-                        StatisticsService::showStats($bot, $db);
-                        return true;
-
-                    case "📬 Xabarlar":
-                        State::set($bot, "state", "broadcast_message");
-                        $bot->sendMessage(
-                            text: "📬 <b>Foydalanuvchilarga xabar yuborish</b>\n\n" .
-                                "Yubormoqchi bo'lgan xabarni kiriting:",
-                            parse_mode: "HTML",
-                            reply_markup: Keyboard::cancel()
-                        );
-                        return true;
-
-                    case "⚙️ Sozlamalar":
-                        $bot->sendMessage(
-                            text: "⚙️ <b>Bot sozlamalari</b>\n\n" .
-                                "Bu bo'lim ishlab chiqilmoqda.",
-                            parse_mode: "HTML",
-                            reply_markup: Keyboard::adminMenu()
-                        );
-                        return true;
-                }
-                break;
-
             case "broadcast_message":
-                if ($text === "🚫 Bekor qilish") {
+                if ($text === Button::BACK) {
                     Menu::showAdminMenu($bot);
                     return true;
                 }
@@ -746,15 +722,14 @@ class MessageHandler
                 State::set($bot, "state", "broadcast_confirm");
 
                 $bot->sendMessage(
-                    text: "📬 <b>Quyidagi xabarni yuborishni tasdiqlaysizmi?</b>\n\n" .
-                        $text,
+                    text: "📬 <b>Quyidagi xabarni yuborishni tasdiqlaysizmi?</b>\n\n" . $text,
                     parse_mode: "HTML",
                     reply_markup: Keyboard::confirm()
                 );
                 return true;
 
             case "broadcast_confirm":
-                if ($text === "✅ Tasdiqlash") {
+                if ($text === Button::CONFIRM) {
                     $broadcastText = State::get($bot, "broadcast_text");
 
                     if (empty($broadcastText)) {
@@ -922,6 +897,9 @@ class MessageHandler
         return false;
     }
 
+    /**
+     * Process stored video data and save to database
+     */
     private static function processStoredVideo(Nutgram $bot, PDO $db): void
     {
         try {

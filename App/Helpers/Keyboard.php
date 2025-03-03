@@ -17,18 +17,18 @@ class Keyboard
     {
         $keyboard = ReplyKeyboardMarkup::make(resize_keyboard: true)
             ->addRow(
-                KeyboardButton::make('🔍 Qidirish'),
-                KeyboardButton::make('❤️ Sevimlilar'),
-                KeyboardButton::make('🔥 Trendlar'),
+                KeyboardButton::make(Button::SEARCH),
+                KeyboardButton::make(Button::FAVORITE),
+                KeyboardButton::make(Button::TRENDING),
             )
             ->addRow(
-                KeyboardButton::make('🎭 Janrlar'),
-                KeyboardButton::make('⭐️ Tavsiyalar')
+                KeyboardButton::make(Button::CATEGORY),
+                KeyboardButton::make(Button::RECOMMENDATION)
             );
 
         if (Validator::isAdmin($bot)) {
             $keyboard->addRow(
-                KeyboardButton::make('🛠 Admin panel')
+                KeyboardButton::make(Button::PANEL)
             );
         }
 
@@ -51,7 +51,7 @@ class Keyboard
                 KeyboardButton::make('⚙️ Sozlamalar')
             )
             ->addRow(
-                KeyboardButton::make('↩️ Orqaga')
+                KeyboardButton::make(Button::BACK)
             );
     }
 
@@ -67,7 +67,7 @@ class Keyboard
                 KeyboardButton::make("📋 Ro'yxat")
             )
             ->addRow(
-                KeyboardButton::make('◀️ Admin panelga qaytish')
+                KeyboardButton::make(Button::BACK)
             );
     }
 
@@ -83,7 +83,7 @@ class Keyboard
                 KeyboardButton::make("📋 Ro'yxat")
             )
             ->addRow(
-                KeyboardButton::make('◀️ Admin panelga qaytish')
+                KeyboardButton::make(Button::BACK)
             );
     }
 
@@ -99,7 +99,7 @@ class Keyboard
     {
         return ReplyKeyboardMarkup::make(resize_keyboard: true)
             ->addRow(
-                KeyboardButton::make('↩️ Orqaga')
+                KeyboardButton::make(Button::BACK)
             );
     }
 
@@ -107,8 +107,8 @@ class Keyboard
     {
         return ReplyKeyboardMarkup::make(resize_keyboard: true)
             ->addRow(
-                KeyboardButton::make('✅ Tasdiqlash'),
-                KeyboardButton::make('🚫 Bekor qilish')
+                KeyboardButton::make(Button::CONFIRM),
+                KeyboardButton::make(Button::CANCEL)
             );
     }
 

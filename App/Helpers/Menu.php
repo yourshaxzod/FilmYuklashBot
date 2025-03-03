@@ -16,6 +16,7 @@ class Menu
 {
     public static function showMainMenu(Nutgram $bot): void
     {
+        State::clearAll($bot);
         State::setScreen($bot, State::MAIN);
         self::sendMenu($bot, Text::mainMenu(), Keyboard::mainMenu($bot));
     }
@@ -28,7 +29,7 @@ class Menu
 
     public static function showSearchMenu(Nutgram $bot): void
     {
-        State::setScreen($bot, State::SEARCH);
+        State::setState($bot, State::SEARCH);
         self::sendMenu($bot, Text::searchMenu(), Keyboard::back());
     }
 

@@ -8,29 +8,15 @@ use App\Models\{Movie, Video, Category};
 use App\Helpers\{Formatter, Keyboard, Validator, Menu, State, Text, Config};
 use PDO;
 
-/**
- * Service for handling movie-related operations
- */
 class MovieService
 {
-    /**
-     * Search for movies
-     * 
-     * @param Nutgram $bot Bot instance
-     * @param PDO $db Database connection
-     * @param string $query Search query
-     * @param int $page Page number
-     * @return void
-     */
     public static function search(Nutgram $bot, PDO $db, string $query, int $page = 1): void
     {
         try {
             $query = trim($query);
 
-            // Store search query for pagination
             State::set($bot, 'last_search_query', $query);
 
-            // First check if query is a numeric ID
             if (Formatter::isNumericString($query)) {
                 $movie = Movie::findById($db, (int)$query, $bot->userId());
                 if ($movie) {
@@ -39,49 +25,38 @@ class MovieService
                 }
             }
 
-            // Get pagination parameters
             $perPage = Config::getItemsPerPage();
             $offset = ($page - 1) * $perPage;
 
-            // Search by text
             $movies = Movie::searchByText($db, $query, $bot->userId(), $perPage, $offset);
             $totalFound = Movie::searchCount($db, $query);
 
-            // If no results found
             if (empty($movies)) {
                 $bot->sendMessage(
                     text: "😞 <b>Hech narsa topilmadi.</b>",
                     parse_mode: ParseMode::HTML,
-                    reply_markup: Keyboard::mainMenu($bot)
                 );
-                State::set($bot, 'state', null);
                 return;
             }
 
-            // If only one result found, show it directly
             if (count($movies) === 1 && $totalFound === 1) {
                 self::showMovie($bot, $db, $movies[0]);
                 return;
             }
 
-            // Calculate total pages
             $totalPages = ceil($totalFound / $perPage);
 
-            // Show search results with pagination
             $message = "🔍 <b>Qidiruv natijalari:</b> \"{$query}\" (sahifa {$page}/{$totalPages})\n\n";
             $message .= "✅ <b>Topildi:</b> {$totalFound} ta kino.\n";
             $message .= "Quyidagilardan birini tanlang:";
 
-            // Create buttons for movies
             $movieButtons = [];
             foreach ($movies as $movie) {
                 $movieButtons[] = [Keyboard::getCallbackButton("🎬 {$movie['title']}", "movie_{$movie['id']}")];
             }
 
-            // Add pagination
             $keyboard = Keyboard::pagination('search', $page, $totalPages, $movieButtons);
 
-            // Send message
             if ($page === 1) {
                 $bot->sendMessage(
                     text: $message,
@@ -103,18 +78,9 @@ class MovieService
         }
     }
 
-    /**
-     * Show movie details
-     * 
-     * @param Nutgram $bot Bot instance
-     * @param PDO $db Database connection
-     * @param array|int $movie Movie data or ID
-     * @return void
-     */
     public static function showMovie(Nutgram $bot, PDO $db, $movie): void
     {
         try {
-            // If movie is an ID, get full movie data
             if (is_int($movie)) {
                 $movie = Movie::findById($db, $movie, $bot->userId());
                 if (!$movie) {
@@ -122,28 +88,22 @@ class MovieService
                 }
             }
 
-            // Add a view for this movie
             Movie::addView($db, $bot->userId(), $movie['id']);
 
-            // Update recommendation system
             TavsiyaService::updateUserInterests($db, $bot->userId(), $movie['id'], 'view');
 
-            // Get videos count and categories
             $videos = Video::getAllByMovieId($db, $movie['id']);
             $videoCount = count($videos);
             $categories = Category::getByMovieId($db, $movie['id']);
 
-            // Prepare movie info text
             $text = Text::movieInfo($movie, $videoCount, $categories, Validator::isAdmin($bot));
 
-            // Prepare extra data for keyboard
             $extras = [
                 'video_count' => $videoCount,
                 'is_liked' => $movie['is_liked'] ?? false,
                 'categories' => $categories
             ];
 
-            // Send photo or text message
             if (!empty($movie['file_id'])) {
                 $bot->sendPhoto(
                     photo: $movie['file_id'],
