@@ -4,11 +4,16 @@ declare(strict_types=1);
 
 date_default_timezone_set("Asia/Tashkent");
 
-require_once __DIR__ . '/vendor/autoload.php';
-require_once __DIR__ . '/config/bot.php';
-require_once __DIR__ . '/config/database.php';
+require_once __DIR__ . "/vendor/autoload.php";
+require_once __DIR__ . "/Config/bot.php";
+require_once __DIR__ . "/Config/database.php";
 
-use App\Handlers\{CommandHandler, MessageHandler, CallbackHandler, MediaHandler};
+use App\Handlers\{
+    CommandHandler,
+    MessageHandler,
+    CallbackHandler,
+    MediaHandler
+};
 use App\Helpers\Config;
 use App\Services\{TavsiyaService, CacheService};
 use SergiX44\Nutgram\Nutgram;
@@ -24,7 +29,7 @@ try {
         CacheService::clearAllCache();
     }
 
-    if (Config::get('ENABLE_RECOMMENDATIONS', true)) {
+    if (Config::get("ENABLE_RECOMMENDATIONS", true)) {
         TavsiyaService::init($db);
     }
 
@@ -38,10 +43,18 @@ try {
             error_log("Bot Error: " . $exception->getMessage());
             error_log("Stack trace: " . $exception->getTraceAsString());
 
-            if ($bot->userId() && in_array($bot->userId(), Config::getAdminIds())) {
+            if (
+                $bot->userId() &&
+                in_array($bot->userId(), Config::getAdminIds())
+            ) {
                 $bot->sendMessage(
-                    text: "⚠️ <b>Xatolik:</b>\n<code>" . htmlspecialchars($exception->getMessage()) . "</code>\n\n<b>File:</b> " . $exception->getFile() . ":" . $exception->getLine(),
-                    parse_mode: 'HTML'
+                    text: "⚠️ <b>Xatolik:</b>\n<code>" .
+                        htmlspecialchars($exception->getMessage()) .
+                        "</code>\n\n<b>File:</b> " .
+                        $exception->getFile() .
+                        ":" .
+                        $exception->getLine(),
+                    parse_mode: "HTML"
                 );
             }
         }
@@ -59,7 +72,7 @@ try {
     });
 
     if (Config::isDebugMode()) {
-        error_log("Bot started at: " . date('Y-m-d H:i:s'));
+        error_log("Bot started at: " . date("Y-m-d H:i:s"));
     }
 
     $bot->run();
