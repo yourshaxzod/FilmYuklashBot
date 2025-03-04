@@ -193,7 +193,7 @@ class Menu
 
     public static function showMovieManageMenu(Nutgram $bot): void
     {
-        State::setScreen($bot, State::ADM_MAIN);
+        State::setScreen($bot, State::ADM_MOVIE);
         self::sendMenu($bot, Text::movieManage(), Keyboard::movieManageMenu());
     }
 

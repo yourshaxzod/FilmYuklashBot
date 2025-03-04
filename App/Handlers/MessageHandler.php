@@ -45,6 +45,18 @@ class MessageHandler
                         self::handleAdminScreenButtons($bot, $db, $text);
                         break;
 
+                    case State::ADM_MOVIE:
+                        self::handleAdminMovieButtons($bot, $db, $text);
+                        break;
+
+                    case State::ADM_CATEGORY:
+                        self::handleAdminCategoryButtons($bot, $db, $text);
+                        break;
+
+                    case State::ADM_CHANNEL:
+                        self::handleAdminChannelButtons($bot, $db, $text);
+                        break;
+
                     default:
                         Menu::showMainMenu($bot);
                         break;
@@ -139,6 +151,96 @@ class MessageHandler
 
             default:
                 Menu::showAdminMenu($bot);
+                break;
+        }
+    }
+
+    private static function handleAdminMovieButtons(Nutgram $bot, PDO $db, string $text): void
+    {
+        if (!Validator::isAdmin($bot)) return;
+
+        switch ($text) {
+            case Button::ADD:
+                Menu::showAddMovieGuide($bot);
+                break;
+
+            case Button::DEL:
+                Menu::showDelMovieMenu($bot);
+                break;
+
+            case Button::EDIT:
+                Menu::showEditMovieGuide($bot);
+                break;
+
+            case Button::LIST:
+                MovieService::showMoviesList($bot, $db);
+                break;
+
+            default:
+                Menu::showMovieManageMenu($bot);
+                break;
+        }
+    }
+
+    private static function handleAdminCategoryButtons(Nutgram $bot, PDO $db, string $text): void
+    {
+        if (!Validator::isAdmin($bot)) {
+            Menu::showMainMenu($bot);
+            return;
+        }
+
+        switch ($text) {
+            case Button::ADD:
+                State::setState($bot, 'add_category_name');
+                Menu::showAddCategoryGuide($bot);
+                break;
+
+            case Button::LIST:
+                CategoryService::showCategoryList($bot, $db, true);
+                break;
+
+            case Button::EDIT:
+                CategoryService::showCategoryList($bot, $db, true);
+                break;
+
+            case Button::DEL:
+                CategoryService::showCategoryList($bot, $db, true);
+                break;
+
+            default:
+                Menu::showCategoryManageMenu($bot, $db);
+                break;
+        }
+    }
+
+    private static function handleAdminChannelButtons(Nutgram $bot, PDO $db, string $text): void
+    {
+        if (!Validator::isAdmin($bot)) {
+            Menu::showMainMenu($bot);
+            return;
+        }
+
+        switch ($text) {
+            case Button::ADD:
+                State::setState($bot, 'add_channel');
+                Menu::showAddChannelGuide($bot);
+                break;
+
+            case Button::DEL:
+                State::setState($bot, 'delete_channel');
+                $bot->sendMessage(
+                    text: "🔐 <b>Kanalni o'chirish</b>\n\nO'chirmoqchi bo'lgan kanal ID raqamini kiriting:",
+                    parse_mode: 'HTML',
+                    reply_markup: Keyboard::cancel()
+                );
+                break;
+
+            case Button::LIST:
+                ChannelService::showChannels($bot, $db);
+                break;
+
+            default:
+                Menu::showChannelManageMenu($bot, $db);
                 break;
         }
     }

@@ -124,4 +124,25 @@ class Formatter
         $categoryNames = array_column($categories, 'name');
         return '#' . implode(' #', $categoryNames);
     }
+
+    public static function formatTimeAgo(string $timestamp): string
+    {
+        $time = strtotime($timestamp);
+        $now = time();
+        $diff = $now - $time;
+        
+        if ($diff < 60) {
+            return "hozirgina";
+        } elseif ($diff < 3600) {
+            return floor($diff / 60) . " daqiqa oldin";
+        } elseif ($diff < 86400) {
+            return floor($diff / 3600) . " soat oldin";
+        } elseif ($diff < 2592000) {
+            return floor($diff / 86400) . " kun oldin";
+        } elseif ($diff < 31536000) {
+            return floor($diff / 2592000) . " oy oldin";
+        } else {
+            return floor($diff / 31536000) . " yil oldin";
+        }
+    }
 }

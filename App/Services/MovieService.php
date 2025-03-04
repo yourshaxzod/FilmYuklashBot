@@ -126,14 +126,6 @@ class MovieService
         }
     }
 
-    /**
-     * Show movies list for admin
-     * 
-     * @param Nutgram $bot Bot instance
-     * @param PDO $db Database connection
-     * @param int $page Page number
-     * @return void
-     */
     public static function showMoviesList(Nutgram $bot, PDO $db, int $page = 1): void
     {
         try {
@@ -145,15 +137,12 @@ class MovieService
                 return;
             }
 
-            // Get pagination parameters
             $perPage = Config::getItemsPerPage();
             $offset = ($page - 1) * $perPage;
 
-            // Get movies
             $movies = Movie::getAll($db, $perPage, $offset);
             $totalMovies = Movie::getCountMovies($db);
 
-            // If no movies found
             if (empty($movies)) {
                 $bot->sendMessage(
                     text: "😞 Bazada hech qanday kino yo'q.",
@@ -162,37 +151,29 @@ class MovieService
                 return;
             }
 
-            // Calculate total pages
             $totalPages = ceil($totalMovies / $perPage);
 
-            // Show movies list with pagination
             $message = "📋 <b>Kinolar ro'yxati</b> (sahifa {$page}/{$totalPages})\n\n";
             $message .= "Jami: {$totalMovies} ta kino\n\n";
 
-            // Add movie info to message
             foreach ($movies as $index => $movie) {
                 $message .= ($index + 1) . ". 🆔<b>{$movie['id']}</b> - {$movie['title']} ({$movie['year']})\n";
                 $message .= "   👁 {$movie['views']} | ❤️ {$movie['likes']} | 📹 {$movie['video_count']}\n";
             }
 
-            // Create navigation buttons
             $buttons = [];
 
-            // Add admin action buttons
             $buttons[] = [
                 Keyboard::getCallbackButton("➕ Qo'shish", "add_movie"),
                 Keyboard::getCallbackButton("🔄 Yangilash", "refresh_movies_list")
             ];
 
-            // Add back button
             $buttons[] = [
                 Keyboard::getCallbackButton("🔙 Orqaga", "back_to_admin")
             ];
 
-            // Add pagination buttons
             $keyboard = Keyboard::pagination('movies_list', $page, $totalPages, $buttons);
 
-            // Send message
             if ($page === 1) {
                 $bot->sendMessage(
                     text: $message,
