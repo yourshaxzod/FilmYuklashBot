@@ -15,6 +15,7 @@ use App\Handlers\{
     MediaHandler
 };
 use App\Helpers\Config;
+use App\Middlewares\UserMiddleware;
 use App\Services\{TavsiyaService, CacheService};
 use SergiX44\Nutgram\Nutgram;
 
@@ -33,6 +34,7 @@ try {
         TavsiyaService::init($db);
     }
 
+    UserMiddleware::register($bot, $db);
     CommandHandler::register($bot, $db);
     MessageHandler::register($bot, $db);
     CallbackHandler::register($bot, $db);

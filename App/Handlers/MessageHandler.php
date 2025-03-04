@@ -3,13 +3,7 @@
 namespace App\Handlers;
 
 use SergiX44\Nutgram\Nutgram;
-use App\Services\{
-    MovieService,
-    CategoryService,
-    ChannelService,
-    StatisticsService,
-    VideoService
-};
+use App\Services\{MovieService, CategoryService, ChannelService, VideoService};
 use App\Models\{Movie, Video, Category, Channel, User};
 use App\Helpers\{Button, Menu, State, Validator, Keyboard, Text};
 use PDO;
@@ -19,34 +13,26 @@ class MessageHandler
     public static function register(Nutgram $bot, PDO $db): void
     {
         $bot->onMessage(function (Nutgram $bot) use ($db) {
-            $state = State::getState($bot);
-            $screen = State::getScreen($bot);
             $text = $bot->message()->text;
 
             if (!$text) {
                 return;
             }
 
+            $state = State::getState($bot);
+            $screen = State::getScreen($bot);
+
+            if ($text === Button::BACK) {
+                self::handleBackButton($bot, $screen);
+                return;
+            }
+
             if ($state) {
-                if (self::handleMovieStates($bot, $db, $state, $text)) {
-                    return;
-                }
-
-                if (self::handleVideoStates($bot, $db, $state, $text)) {
-                    return;
-                }
-
-                if (self::handleCategoryStates($bot, $db, $state, $text)) {
-                    return;
-                }
-
-                if (self::handleAdminStates($bot, $db, $state, $text)) {
-                    return;
-                }
-
-                if (self::handleChannelStates($bot, $db, $state, $text)) {
-                    return;
-                }
+                if (self::handleMovieStates($bot, $db, $state, $text)) return;
+                if (self::handleVideoStates($bot, $db, $state, $text)) return;
+                if (self::handleCategoryStates($bot, $db, $state, $text)) return;
+                if (self::handleAdminStates($bot, $db, $state, $text)) return;
+                if (self::handleChannelStates($bot, $db, $state, $text)) return;
             }
 
             if ($screen) {
@@ -70,7 +56,29 @@ class MessageHandler
         });
     }
 
-    public static function handleMainScreenButtons(Nutgram $bot,PDO $db, string $text): void {
+    public static function handleBackButton(Nutgram $bot, $screen)
+    {
+        switch ($screen) {
+            case State::ADM_MAIN:
+                Menu::showMainMenu($bot);
+                break;
+
+            case State::ADM_BROADCAST:
+            case State::ADM_CATEGORY:
+            case State::ADM_CHANNEL:
+            case State::ADM_MOVIE:
+            case State::ADM_STATISTIC:
+                Menu::showAdminMenu($bot);
+                break;
+
+            default:
+                Menu::showMainMenu($bot);
+                break;
+        }
+    }
+
+    public static function handleMainScreenButtons(Nutgram $bot, PDO $db, string $text): void
+    {
         switch ($text) {
             case Button::SEARCH:
                 Menu::showSearchMenu($bot);
@@ -104,14 +112,11 @@ class MessageHandler
         }
     }
 
-    public static function handleAdminScreenButtons(Nutgram $bot, PDO $db, string $text): void {
+    public static function handleAdminScreenButtons(Nutgram $bot, PDO $db, string $text): void
+    {
         if (!Validator::isAdmin($bot)) return;
 
         switch ($text) {
-            case Button::BACK:
-                Menu::showMainMenu($bot);
-                break;
-
             case Button::MOVIE:
                 Menu::showMovieManageMenu($bot);
                 break;
@@ -138,13 +143,10 @@ class MessageHandler
         }
     }
 
-    private static function handleMovieStates(Nutgram $bot, PDO $db, string $state, string $text): bool {
+    private static function handleMovieStates(Nutgram $bot, PDO $db, string $state, string $text): bool
+    {
         switch ($state) {
             case State::SEARCH:
-                if ($text === Button::BACK) {
-                    Menu::showMainMenu($bot);
-                    return true;
-                }
                 MovieService::search($bot, $db, $text);
                 return true;
 
@@ -713,7 +715,7 @@ class MessageHandler
 
         switch ($state) {
             case "broadcast_message":
-                if ($text === Button::BACK) {
+                if ($text === Button::CANCEL) {
                     Menu::showAdminMenu($bot);
                     return true;
                 }

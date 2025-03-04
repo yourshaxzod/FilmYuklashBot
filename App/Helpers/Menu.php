@@ -29,6 +29,7 @@ class Menu
 
     public static function showSearchMenu(Nutgram $bot): void
     {
+        State::setScreen($bot, State::MAIN);
         State::setState($bot, State::SEARCH);
         self::sendMenu($bot, Text::searchMenu(), Keyboard::back());
     }
@@ -192,16 +193,19 @@ class Menu
 
     public static function showMovieManageMenu(Nutgram $bot): void
     {
+        State::setScreen($bot, State::ADM_MAIN);
         self::sendMenu($bot, Text::movieManage(), Keyboard::movieManageMenu());
     }
 
     public static function showCategoryManageMenu(Nutgram $bot, PDO $db): void
     {
+        State::setScreen($bot, State::ADM_CATEGORY);
         CategoryService::showCategoryList($bot, $db, true);
     }
 
     public static function showChannelManageMenu(Nutgram $bot, PDO $db): void
     {
+        State::setScreen($bot, State::ADM_CHANNEL);
         ChannelService::showChannels($bot, $db);
     }
 
@@ -212,7 +216,7 @@ class Menu
 
     public static function showBroadcastMenu(Nutgram $bot): void
     {
-        State::setScreen($bot, State::ADM_BROADCAST);
+        State::setState($bot, 'broadcast_message');
 
         $message = "📣 <b>Foydalanuvchilarga yubormoqchi bo'lgan xabarni kiriting:</b>";
 

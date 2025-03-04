@@ -40,7 +40,7 @@ class Keyboard
         return ReplyKeyboardMarkup::make(resize_keyboard: true)
             ->addRow(
                 KeyboardButton::make('🎬 Kinolar'),
-                KeyboardButton::make('🎭 Janrlar')
+                KeyboardButton::make(Button::CATEGORY)
             )
             ->addRow(
                 KeyboardButton::make('🔐 Kanallar'),

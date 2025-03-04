@@ -278,6 +278,7 @@ class Movie
     public static function getRecommendations(PDO $db, int $userId, int $limit = 10, int $offset = 0): array
     {
         try {
+            // Get viewed movies
             $sql = "SELECT DISTINCT movie_id FROM user_views WHERE user_id = :user_id";
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
@@ -288,35 +289,36 @@ class Movie
 
             $excludeIds = empty($viewedMovieIds) ? "0" : implode(",", $viewedMovieIds);
 
+            // Main recommendations query
             $sql = "
-                SELECT 
-                    m.*,
-                    (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) as video_count,
-                    CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked,
-                    AVG(ui.score) as recommendation_score
-                FROM 
-                    movies m
-                JOIN 
-                    movie_categories mc ON m.id = mc.movie_id
-                JOIN 
-                    user_interests ui ON mc.category_id = ui.category_id
-                LEFT JOIN 
-                    user_likes ul ON m.id = ul.movie_id AND ul.user_id = :user_id
-                WHERE 
-                    ui.user_id = :user_id
-                    AND m.id NOT IN ({$excludeIds})
-                    AND (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) > 0
-                GROUP BY 
-                    m.id
-                HAVING 
-                    AVG(ui.score) >= :threshold
-                ORDER BY 
-                    recommendation_score DESC, m.created_at DESC
-                LIMIT :limit OFFSET :offset
-            ";
+            SELECT 
+                m.*,
+                (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) as video_count,
+                IF(ul.id IS NOT NULL, 1, 0) as is_liked,
+                AVG(ui.score) as recommendation_score
+            FROM 
+                movies m
+            JOIN 
+                movie_categories mc ON m.id = mc.movie_id
+            JOIN 
+                user_interests ui ON mc.category_id = ui.category_id AND ui.user_id = :user_id
+            LEFT JOIN 
+                user_likes ul ON m.id = ul.movie_id AND ul.user_id = :user_id2
+            WHERE 
+                m.id NOT IN ({$excludeIds})
+                AND (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) > 0
+            GROUP BY 
+                m.id, m.title, m.description, m.year, m.file_id, m.views, m.likes, m.created_at, m.updated_at, ul.id
+            HAVING 
+                AVG(ui.score) >= :threshold
+            ORDER BY 
+                recommendation_score DESC, m.created_at DESC
+            LIMIT :limit OFFSET :offset
+        ";
 
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+            $stmt->bindValue(':user_id2', $userId, PDO::PARAM_INT); // Added second binding
             $stmt->bindValue(':threshold', $threshold, PDO::PARAM_STR);
             $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
             $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
@@ -328,6 +330,7 @@ class Movie
                 $recommendedMovies[$key]['categories'] = Category::getByMovieId($db, $movie['id']);
             }
 
+            // Fill with trending if needed
             if (count($recommendedMovies) < $limit) {
                 $moreNeeded = $limit - count($recommendedMovies);
                 $existingIds = array_column($recommendedMovies, 'id');
@@ -335,21 +338,23 @@ class Movie
                 $excludeIdsStr = empty($excludeIds) ? "0" : implode(",", $excludeIds);
 
                 $sql = "
-                    SELECT 
-                        m.*,
-                        (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) as video_count,
-                        CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked
-                    FROM 
-                        movies m 
-                    LEFT JOIN 
-                        user_likes ul ON m.id = ul.movie_id AND ul.user_id = :user_id
-                    WHERE 
-                        m.id NOT IN ({$excludeIdsStr})
-                        AND (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) > 0
-                    ORDER BY 
-                        (m.views * 0.7 + m.likes * 0.3) DESC, m.created_at DESC
-                    LIMIT :limit
-                ";
+                SELECT 
+                    m.*,
+                    (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) as video_count,
+                    IF(ul.id IS NOT NULL, 1, 0) as is_liked
+                FROM 
+                    movies m 
+                LEFT JOIN 
+                    user_likes ul ON m.id = ul.movie_id AND ul.user_id = :user_id
+                WHERE 
+                    m.id NOT IN ({$excludeIdsStr})
+                    AND (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) > 0
+                GROUP BY
+                    m.id, m.title, m.description, m.year, m.file_id, m.views, m.likes, m.created_at, m.updated_at, ul.id
+                ORDER BY 
+                    (m.views * 0.7 + m.likes * 0.3) DESC, m.created_at DESC
+                LIMIT :limit
+            ";
 
                 $stmt = $db->prepare($sql);
                 $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
@@ -385,30 +390,31 @@ class Movie
             $excludeIds = empty($viewedMovieIds) ? "0" : implode(",", $viewedMovieIds);
 
             $sql = "
-                SELECT 
-                    COUNT(DISTINCT m.id) as count
-                FROM 
-                    movies m
-                JOIN 
-                    movie_categories mc ON m.id = mc.movie_id
-                JOIN 
-                    user_interests ui ON mc.category_id = ui.category_id
-                WHERE 
-                    ui.user_id = :user_id
-                    AND m.id NOT IN ({$excludeIds})
-                    AND (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) > 0
-                    AND (
-                        SELECT AVG(score) 
-                        FROM user_interests 
-                        WHERE user_id = :user_id 
-                        AND category_id IN (
-                            SELECT category_id FROM movie_categories WHERE movie_id = m.id
-                        )
-                    ) >= :threshold
-            ";
+            SELECT 
+                COUNT(DISTINCT m.id) as count
+            FROM 
+                movies m
+            JOIN 
+                movie_categories mc ON m.id = mc.movie_id
+            JOIN 
+                user_interests ui ON mc.category_id = ui.category_id
+            WHERE 
+                ui.user_id = :user_id
+                AND m.id NOT IN ({$excludeIds})
+                AND (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) > 0
+                AND (
+                    SELECT AVG(score) 
+                    FROM user_interests 
+                    WHERE user_id = :user_id2
+                    AND category_id IN (
+                        SELECT category_id FROM movie_categories WHERE movie_id = m.id
+                    )
+                ) >= :threshold
+        ";
 
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+            $stmt->bindValue(':user_id2', $userId, PDO::PARAM_INT);
             $stmt->bindValue(':threshold', $threshold, PDO::PARAM_STR);
             $stmt->execute();
 
