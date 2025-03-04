@@ -21,19 +21,12 @@ class CategoryService
 
                 if ($isAdmin) {
                     $message .= "\n\nAdmin sifatida kategoriya qo'shishingiz mumkin!";
-                    $keyboard = Keyboard::getInlineKeyboard([
-                        [Keyboard::getCallbackButton("➕ Kategoriya qo'shish", "add_category")]
-                    ]);
-                } else {
-                    $keyboard = Keyboard::getInlineKeyboard([
-                        [Keyboard::getCallbackButton("🔙 Orqaga", "back_to_main")]
-                    ]);
                 }
 
                 $bot->sendMessage(
                     text: $message,
                     parse_mode: ParseMode::HTML,
-                    reply_markup: $keyboard
+                    reply_markup: Keyboard::categoryManageMenu()
                 );
                 return;
             }

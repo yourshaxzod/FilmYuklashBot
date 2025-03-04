@@ -2,7 +2,8 @@
 
 namespace App\Helpers;
 
-class Button {
+class Button
+{
     // MAIN
     public const SEARCH = "🔍 Qidirish";
     public const FAVORITE = "❤️ Sevimlilar";
@@ -10,7 +11,7 @@ class Button {
     public const CATEGORY = "🎭 Janrlar";
     public const RECOMMENDATION = "⭐️ Tavsiyalar";
     public const PANEL = "🛠 Statistika va Boshqaruv";
-    
+
     public const BACK = "↩️ Ortga qaytish";
 
     // ADM
@@ -20,11 +21,8 @@ class Button {
     public const MESSAGE = "📬 Xabarlar";
     public const SETTINGS = "⚙️ Sozlamalar";
 
-    public const ADD_MOIVE = "➕ Kino qo'shish";
-    public const DEL_MOVIE = "➖ Kino o'chirish";
-
-    public const ADD_CATEGORY = "➕ Kategoriya qo'shish";
-    public const DEL_CATEGORY = "➖ Kategoriya o'chirish";
+    public const ADD = "➕ Qo'shish";
+    public const DEL = "➖ O'chirish";
 
     public const EDIT = "✏️ Tahrirlash";
     public const LIST = "📋 Ro'yxat";

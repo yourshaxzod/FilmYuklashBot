@@ -39,16 +39,16 @@ class Keyboard
     {
         return ReplyKeyboardMarkup::make(resize_keyboard: true)
             ->addRow(
-                KeyboardButton::make('🎬 Kinolar'),
+                KeyboardButton::make(Button::MOVIE),
                 KeyboardButton::make(Button::CATEGORY)
             )
             ->addRow(
-                KeyboardButton::make('🔐 Kanallar'),
-                KeyboardButton::make('📊 Statistika')
+                KeyboardButton::make(Button::CHANNEL),
+                KeyboardButton::make(Button::STATISTIC)
             )
             ->addRow(
-                KeyboardButton::make('📬 Xabarlar'),
-                KeyboardButton::make('⚙️ Sozlamalar')
+                KeyboardButton::make(Button::MESSAGE),
+                KeyboardButton::make(Button::STATISTIC)
             )
             ->addRow(
                 KeyboardButton::make(Button::BACK)
@@ -59,12 +59,12 @@ class Keyboard
     {
         return ReplyKeyboardMarkup::make(resize_keyboard: true)
             ->addRow(
-                KeyboardButton::make("➕ Kino qo'shish"),
-                KeyboardButton::make("➖ Kino o'chirish")
+                KeyboardButton::make(Button::ADD),
+                KeyboardButton::make(Button::DEL)
             )
             ->addRow(
-                KeyboardButton::make("✏️ Tahrirlash"),
-                KeyboardButton::make("📋 Ro'yxat")
+                KeyboardButton::make(Button::EDIT),
+                KeyboardButton::make(Button::LIST)
             )
             ->addRow(
                 KeyboardButton::make(Button::BACK)
@@ -75,12 +75,12 @@ class Keyboard
     {
         return ReplyKeyboardMarkup::make(resize_keyboard: true)
             ->addRow(
-                KeyboardButton::make("➕ Kategoriya qo'shish"),
-                KeyboardButton::make("➖ Kategoriya o'chirish")
+                KeyboardButton::make(Button::ADD),
+                KeyboardButton::make(Button::DEL)
             )
             ->addRow(
-                KeyboardButton::make("✏️ Tahrirlash"),
-                KeyboardButton::make("📋 Ro'yxat")
+                KeyboardButton::make(Button::EDIT),
+                KeyboardButton::make(Button::LIST)
             )
             ->addRow(
                 KeyboardButton::make(Button::BACK)
@@ -91,7 +91,7 @@ class Keyboard
     {
         return ReplyKeyboardMarkup::make(resize_keyboard: true)
             ->addRow(
-                KeyboardButton::make('🚫 Bekor qilish')
+                KeyboardButton::make(Button::CANCEL)
             );
     }
 
