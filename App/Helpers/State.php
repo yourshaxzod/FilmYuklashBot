@@ -125,4 +125,19 @@ class State
     {
         self::clear($bot, ['process', 'process_data', 'process_step']);
     }
+
+    public static function isMovieCreation(Nutgram $bot): bool
+    {
+        $state = self::getState($bot);
+        return $state === 'add_movie_confirm' || $state === 'add_movie_photo';
+    }
+
+    public static function isInState(Nutgram $bot, string|array $states): bool
+    {
+        $currentState = self::getState($bot);
+        if (is_array($states)) {
+            return in_array($currentState, $states);
+        }
+        return $currentState === $states;
+    }
 }

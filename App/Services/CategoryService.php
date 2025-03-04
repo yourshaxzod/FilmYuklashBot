@@ -31,12 +31,10 @@ class CategoryService
                 return;
             }
 
-            // Create message with categories
             $message = "🏷 <b>Kategoriyalar</b>\n\n";
             $message .= "Kategoriyalar soni: " . count($categories) . "\n\n";
             $message .= "Kerakli kategoriyani tanlang:";
 
-            // Create category buttons
             $keyboard = Keyboard::categoryList($categories, $isAdmin);
 
             $bot->sendMessage(
@@ -55,7 +53,6 @@ class CategoryService
     public static function showCategoryMovies(Nutgram $bot, PDO $db, int $categoryId, int $page = 1): void
     {
         try {
-            // Get category info
             $category = Category::findById($db, $categoryId);
             if (!$category) {
                 $bot->sendMessage(
@@ -65,15 +62,12 @@ class CategoryService
                 return;
             }
 
-            // Get pagination parameters
             $perPage = Config::getItemsPerPage();
             $offset = ($page - 1) * $perPage;
 
-            // Get movies in this category
             $movies = Movie::getByCategoryId($db, $categoryId, $bot->userId(), $perPage, $offset);
             $totalMovies = Movie::getCountByCategoryId($db, $categoryId);
 
-            // If no movies found
             if (empty($movies)) {
                 $message = "🏷 <b>Kategoriya:</b> {$category['name']}\n\n";
 
@@ -95,10 +89,8 @@ class CategoryService
                 return;
             }
 
-            // Calculate total pages
             $totalPages = ceil($totalMovies / $perPage);
 
-            // Create message
             $message = "🏷 <b>Kategoriya:</b> {$category['name']} (sahifa {$page}/{$totalPages})\n\n";
 
             if (!empty($category['description'])) {
@@ -108,19 +100,15 @@ class CategoryService
             $message .= "Bu kategoriyadagi kinolar soni: {$totalMovies}\n\n";
             $message .= "Quyidagi kinolardan birini tanlang:";
 
-            // Create buttons for movies
             $movieButtons = [];
             foreach ($movies as $movie) {
                 $movieButtons[] = [Keyboard::getCallbackButton("🎬 {$movie['title']}", "movie_{$movie['id']}")];
             }
 
-            // Add back button
             $movieButtons[] = [Keyboard::getCallbackButton("🔙 Kategoriyalarga qaytish", "categories")];
 
-            // Add pagination
             $keyboard = Keyboard::pagination("category_{$categoryId}", $page, $totalPages, $movieButtons);
 
-            // Send or update message
             if ($page === 1) {
                 $bot->sendMessage(
                     text: $message,
@@ -142,14 +130,6 @@ class CategoryService
         }
     }
 
-    /**
-     * Start category editing process
-     * 
-     * @param Nutgram $bot Bot instance
-     * @param PDO $db Database connection
-     * @param int $categoryId Category ID
-     * @return void
-     */
     public static function startEditCategory(Nutgram $bot, PDO $db, int $categoryId): void
     {
         try {
@@ -158,14 +138,12 @@ class CategoryService
                 return;
             }
 
-            // Get category info
             $category = Category::findById($db, $categoryId);
             if (!$category) {
                 $bot->sendMessage(text: Text::categoryNotFound());
                 return;
             }
 
-            // Create edit message
             $message = "✏️ <b>Kategoriyani tahrirlash</b>\n\n";
             $message .= "Kategoriya: <b>{$category['name']}</b>\n";
 
@@ -175,7 +153,6 @@ class CategoryService
 
             $message .= "\nNimani tahrirlash kerak?";
 
-            // Create edit buttons
             $keyboard = Keyboard::getInlineKeyboard([
                 [
                     Keyboard::getCallbackButton("✏️ Nom", "edit_category_name_{$categoryId}"),
@@ -199,14 +176,6 @@ class CategoryService
         }
     }
 
-    /**
-     * Show category selector for movies
-     * 
-     * @param Nutgram $bot Bot instance
-     * @param PDO $db Database connection
-     * @param int $movieId Movie ID
-     * @return void
-     */
     public static function showCategorySelector(Nutgram $bot, PDO $db, int $movieId): void
     {
         try {
@@ -215,17 +184,14 @@ class CategoryService
                 return;
             }
 
-            // Get movie info
             $movie = Movie::findById($db, $movieId);
             if (!$movie) {
                 $bot->sendMessage(text: Text::movieNotFound());
                 return;
             }
 
-            // Get all categories
             $categories = Category::getAll($db);
 
-            // If no categories found
             if (empty($categories)) {
                 $message = "🏷 <b>Kategoriyalar</b>\n\n";
                 $message .= "Hozircha kategoriyalar yo'q. Avval kategoriyalar qo'shing.";
@@ -240,20 +206,16 @@ class CategoryService
                 return;
             }
 
-            // Get current movie categories
             $currentCategories = Category::getByMovieId($db, $movieId);
             $selectedIds = array_column($currentCategories, 'id');
 
-            // Save editing state
             State::set($bot, 'editing_movie_id', $movieId);
             State::set($bot, 'selected_categories', $selectedIds);
 
-            // Create message
             $message = "🏷 <b>Kino kategoriyalarini tanlash</b>\n\n";
             $message .= "Kino: <b>{$movie['title']}</b>\n\n";
             $message .= "Bir yoki bir nechta kategoriyalarni tanlang:";
 
-            // Create selection keyboard
             $keyboard = Keyboard::categorySelector($categories, $selectedIds);
 
             $bot->sendMessage(
@@ -269,38 +231,24 @@ class CategoryService
         }
     }
 
-    /**
-     * Update category selector with selected categories
-     * 
-     * @param Nutgram $bot Bot instance
-     * @param PDO $db Database connection
-     * @param int $movieId Movie ID
-     * @param array $selectedIds Selected category IDs
-     * @return void
-     */
     public static function updateCategorySelector(Nutgram $bot, PDO $db, int $movieId, array $selectedIds): void
     {
         try {
             if (!Validator::isAdmin($bot)) {
-                $bot->sendMessage(text: Text::noPermission());
                 return;
             }
 
-            // Get movie info
             $movie = Movie::findById($db, $movieId);
             if (!$movie) {
-                $bot->sendMessage(text: Text::movieNotFound());
+                $bot->answerCallbackQuery(text: "⚠️ Kino topilmadi", show_alert: true);
                 return;
             }
 
-            // Get all categories
             $categories = Category::getAll($db);
 
-            // Create message
             $message = "🏷 <b>Kino kategoriyalarini tanlash</b>\n\n";
             $message .= "Kino: <b>{$movie['title']}</b>\n\n";
 
-            // Show selected categories
             if (!empty($selectedIds)) {
                 $selectedCategories = array_filter($categories, function ($cat) use ($selectedIds) {
                     return in_array($cat['id'], $selectedIds);
@@ -312,7 +260,6 @@ class CategoryService
 
             $message .= "Bir yoki bir nechta kategoriyalarni tanlang:";
 
-            // Create updated selection keyboard
             $keyboard = Keyboard::categorySelector($categories, $selectedIds);
 
             $bot->editMessageText(
@@ -328,12 +275,49 @@ class CategoryService
         }
     }
 
-    /**
-     * Get all categories for cache
-     * 
-     * @param PDO $db Database connection
-     * @return array Categories data
-     */
+    public static function updateCategorySelectorForCreation(Nutgram $bot, PDO $db, array $selectedIds): void
+    {
+        try {
+            if (!Validator::isAdmin($bot)) {
+                return;
+            }
+
+            $categories = Category::getAll($db);
+
+            $title = State::get($bot, 'movie_title');
+
+            $message = "🏷 <b>Kino kategoriyalarini tanlash</b>\n\n";
+
+            if ($title) {
+                $message .= "Kino: <b>{$title}</b>\n\n";
+            }
+
+            if (!empty($selectedIds)) {
+                $selectedCategories = array_filter($categories, function ($cat) use ($selectedIds) {
+                    return in_array($cat['id'], $selectedIds);
+                });
+
+                $selectedNames = array_column($selectedCategories, 'name');
+                $message .= "Tanlangan: <b>" . implode(', ', $selectedNames) . "</b>\n\n";
+            }
+
+            $message .= "Bir yoki bir nechta kategoriyalarni tanlang:";
+
+            $keyboard = Keyboard::categorySelector($categories, $selectedIds);
+
+            $bot->editMessageText(
+                text: $message,
+                parse_mode: ParseMode::HTML,
+                reply_markup: $keyboard
+            );
+        } catch (\Exception $e) {
+            $bot->answerCallbackQuery(
+                text: "⚠️ Xatolik: " . $e->getMessage(),
+                show_alert: true
+            );
+        }
+    }
+
     public static function getAllForCache(PDO $db): array
     {
         try {

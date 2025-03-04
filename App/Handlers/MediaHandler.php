@@ -8,6 +8,7 @@ use App\Services\VideoService;
 use App\Helpers\{State, Formatter, Keyboard, Text, Menu};
 use App\Services\MovieService;
 use PDO;
+
 class MediaHandler
 {
     public static function register(Nutgram $bot, PDO $db): void
@@ -112,6 +113,8 @@ class MediaHandler
             caption: $message,
             parse_mode: 'HTML'
         );
+
+        State::set($bot, 'selected_categories', []);
 
         self::offerCategorySelection($bot, $db);
 

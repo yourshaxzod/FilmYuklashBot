@@ -481,20 +481,20 @@ class Movie
             $db->beginTransaction();
 
             $sql = "
-                INSERT INTO movies (
-                    title, 
-                    description, 
-                    year, 
-                    file_id, 
-                    created_at
-                ) VALUES (
-                    :title, 
-                    :description, 
-                    :year, 
-                    :file_id, 
-                    NOW()
-                )
-            ";
+            INSERT INTO movies (
+                title, 
+                description, 
+                year, 
+                file_id, 
+                created_at
+            ) VALUES (
+                :title, 
+                :description, 
+                :year, 
+                :file_id, 
+                NOW()
+            )
+        ";
 
             $stmt = $db->prepare($sql);
             $stmt->execute([
@@ -504,18 +504,47 @@ class Movie
                 'file_id' => $data['file_id'] ?? null
             ]);
 
-            $movieId = $db->lastInsertId();
+            $movieId = (int)$db->lastInsertId();
 
             if (!empty($categoryIds)) {
-                Category::saveMovieCategories($db, $movieId, $categoryIds);
+                $intCategoryIds = array_map('intval', $categoryIds);
+
+                self::saveCategoriesInternal($db, $movieId, $intCategoryIds);
             }
 
             $db->commit();
 
             return $movieId;
         } catch (Exception $e) {
-            $db->rollBack();
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
             throw new Exception("Kino qo'shishda xatolik: " . $e->getMessage());
+        }
+    }
+
+    private static function saveCategoriesInternal(PDO $db, int $movieId, array $categoryIds): void
+    {
+        try {
+            $stmt = $db->prepare("DELETE FROM movie_categories WHERE movie_id = ?");
+            $stmt->execute([$movieId]);
+
+            if (!empty($categoryIds)) {
+                $values = [];
+                $placeholders = [];
+
+                foreach ($categoryIds as $categoryId) {
+                    $values[] = $movieId;
+                    $values[] = $categoryId;
+                    $placeholders[] = "(?, ?)";
+                }
+
+                $sql = "INSERT INTO movie_categories (movie_id, category_id) VALUES " . implode(", ", $placeholders);
+                $stmt = $db->prepare($sql);
+                $stmt->execute($values);
+            }
+        } catch (Exception $e) {
+            throw new Exception("Kino kategoriyalarini saqlashda xatolik: " . $e->getMessage());
         }
     }
 

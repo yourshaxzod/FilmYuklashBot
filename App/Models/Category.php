@@ -291,7 +291,11 @@ class Category
     public static function saveMovieCategories(PDO $db, int $movieId, array $categoryIds): void
     {
         try {
-            $db->beginTransaction();
+            $shouldCommit = !$db->inTransaction();
+
+            if ($shouldCommit) {
+                $db->beginTransaction();
+            }
 
             $stmt = $db->prepare("DELETE FROM movie_categories WHERE movie_id = ?");
             $stmt->execute([$movieId]);
@@ -301,6 +305,8 @@ class Category
                 $placeholders = [];
 
                 foreach ($categoryIds as $categoryId) {
+
+                    $categoryId = (int)$categoryId;
                     $values[] = $movieId;
                     $values[] = $categoryId;
                     $placeholders[] = "(?, ?)";
@@ -311,9 +317,13 @@ class Category
                 $stmt->execute($values);
             }
 
-            $db->commit();
+            if ($shouldCommit) {
+                $db->commit();
+            }
         } catch (Exception $e) {
-            $db->rollBack();
+            if ($shouldCommit && $db->inTransaction()) {
+                $db->rollBack();
+            }
             throw new Exception("Kino kategoriyalarini saqlashda xatolik: " . $e->getMessage());
         }
     }

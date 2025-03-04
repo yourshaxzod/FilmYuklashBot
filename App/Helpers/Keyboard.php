@@ -442,7 +442,7 @@ class Keyboard
         $keyboard = InlineKeyboardMarkup::make();
 
         foreach ($categories as $category) {
-            $isSelected = in_array($category['id'], $selectedIds);
+            $isSelected = in_array((string)$category['id'], $selectedIds) || in_array((int)$category['id'], $selectedIds);
             $prefix = $isSelected ? "✅ " : "";
 
             $keyboard->addRow(

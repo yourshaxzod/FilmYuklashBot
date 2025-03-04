@@ -285,16 +285,12 @@ class MessageHandler
                     try {
                         $movieData = [
                             "title" => State::get($bot, "movie_title"),
-                            "description" => State::get(
-                                $bot,
-                                "movie_description"
-                            ),
+                            "description" => State::get($bot, "movie_description"),
                             "year" => State::get($bot, "movie_year"),
                             "file_id" => State::get($bot, "movie_photo"),
                         ];
 
-                        $categoryIds =
-                            State::get($bot, "selected_categories") ?? [];
+                        $categoryIds = array_map('intval', State::get($bot, "selected_categories") ?? []);
 
                         $movieId = Movie::create($db, $movieData, $categoryIds);
 
@@ -330,7 +326,6 @@ class MessageHandler
                 }
                 return true;
 
-                // Movie edit ID input
             case "edit_movie_id":
                 if (!is_numeric($text)) {
                     $bot->sendMessage("⚠️ Kino ID raqam bo'lishi kerak!");

@@ -383,8 +383,14 @@ class CallbackHandler
 
             State::set($bot, 'selected_categories', $selectedCategories);
 
-            $movieId = State::get($bot, 'editing_movie_id');
-            CategoryService::updateCategorySelector($bot, $db, (int)$movieId, $selectedCategories);
+            if (State::isMovieCreation($bot)) {
+                CategoryService::updateCategorySelectorForCreation($bot, $db, $selectedCategories);
+            } else {
+                $movieId = State::get($bot, 'editing_movie_id');
+                if ($movieId) {
+                    CategoryService::updateCategorySelector($bot, $db, (int)$movieId, $selectedCategories);
+                }
+            }
 
             $bot->answerCallbackQuery();
         });
@@ -398,23 +404,38 @@ class CallbackHandler
                 return;
             }
 
-            $movieId = State::get($bot, 'editing_movie_id');
-            $selectedCategories = State::get($bot, 'selected_categories') ?? [];
+            if (State::isMovieCreation($bot)) {
+                $selectedCategories = State::get($bot, 'selected_categories') ?? [];
 
-            try {
-                Category::saveMovieCategories($db, (int)$movieId, $selectedCategories);
-
-                $movie = Movie::findById($db, (int)$movieId, $bot->userId());
-                MovieService::showMovie($bot, $db, (int)$movieId);
-
-                $bot->answerCallbackQuery(text: "✅ Kategoriyalar saqlandi!");
-
-                State::clear($bot, ['editing_movie_id', 'selected_categories']);
-            } catch (\Exception $e) {
-                $bot->answerCallbackQuery(
-                    text: "⚠️ Xatolik: " . $e->getMessage(),
-                    show_alert: true
+                $bot->answerCallbackQuery(text: "✅ Saqlandi");
+                $bot->sendMessage(
+                    text: "✅ Kategoriyalar saqlandi! Davom etish uchun \"✅ Tasdiqlash\" tugmasini bosing.",
+                    reply_markup: Keyboard::confirm()
                 );
+            } else {
+                $movieId = State::get($bot, 'editing_movie_id');
+                $selectedCategories = State::get($bot, 'selected_categories') ?? [];
+
+                if (!$movieId) {
+                    $bot->answerCallbackQuery(text: "⚠️ Kino topilmadi");
+                    return;
+                }
+
+                try {
+                    $categoryIds = array_map('intval', $selectedCategories);
+
+                    Category::saveMovieCategories($db, (int)$movieId, $categoryIds);
+
+                    $bot->answerCallbackQuery(text: "✅ Saqlandi");
+
+                    $movie = Movie::findById($db, (int)$movieId, $bot->userId());
+                    MovieService::showMovie($bot, $db, (int)$movieId);
+
+                    State::clear($bot, ['editing_movie_id', 'selected_categories']);
+                } catch (\Exception $e) {
+                    $bot->answerCallbackQuery(text: "⚠️ Xatolik");
+                    $bot->sendMessage(text: "⚠️ Xatolik: " . $e->getMessage());
+                }
             }
         });
 
