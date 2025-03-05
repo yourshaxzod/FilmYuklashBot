@@ -3,6 +3,7 @@
 namespace App\Helpers;
 
 use SergiX44\Nutgram\Nutgram;
+use PDO;
 
 class State
 {
@@ -25,39 +26,85 @@ class State
     public const ADM_BROADCAST = 'adm_broadcast';
     public const ADM_STATISTIC = 'adm_statistic';
 
-
     public static function get(Nutgram $bot, string $key = 'state'): mixed
     {
-        $data = $bot->getUserData('data') ?? [];
+        global $db;
+
+        $userId = $bot->userId();
+        if (!$userId) return null;
+
+        $stmt = $db->prepare("SELECT data FROM users WHERE user_id = ?");
+        $stmt->execute([$userId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$result || !$result['data']) {
+            return null;
+        }
+
+        $data = json_decode($result['data'], true) ?? [];
         return $data[$key] ?? null;
     }
 
     public static function set(Nutgram $bot, string $key, $value): void
     {
-        $data = $bot->getUserData('data') ?? [];
+        global $db;
+
+        $userId = $bot->userId();
+        if (!$userId) return;
+
+        $stmt = $db->prepare("SELECT data FROM users WHERE user_id = ?");
+        $stmt->execute([$userId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        $data = [];
+        if ($result && $result['data']) {
+            $data = json_decode($result['data'], true) ?? [];
+        }
+
         $data[$key] = $value;
-        $bot->setUserData('data', $data);
+
+        $stmt = $db->prepare("UPDATE users SET data = ? WHERE user_id = ?");
+        $stmt->execute([json_encode($data), $userId]);
     }
 
     public static function clear(Nutgram $bot, ?array $keys = null): void
     {
-        if ($keys === null) {
-            $data = $bot->getUserData('data') ?? [];
-            unset($data['state']);
-            $bot->setUserData('data', $data);
+        global $db;
+
+        $userId = $bot->userId();
+        if (!$userId) return;
+
+        $stmt = $db->prepare("SELECT data FROM users WHERE user_id = ?");
+        $stmt->execute([$userId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$result || !$result['data']) {
             return;
         }
 
-        $data = $bot->getUserData('data') ?? [];
-        foreach ($keys as $key) {
-            unset($data[$key]);
+        $data = json_decode($result['data'], true) ?? [];
+
+        if ($keys === null) {
+            unset($data['state']);
+        } else {
+            foreach ($keys as $key) {
+                unset($data[$key]);
+            }
         }
-        $bot->setUserData('data', $data);
+
+        $stmt = $db->prepare("UPDATE users SET data = ? WHERE user_id = ?");
+        $stmt->execute([json_encode($data), $userId]);
     }
 
     public static function clearAll(Nutgram $bot): void
     {
-        $bot->setUserData('data', []);
+        global $db;
+
+        $userId = $bot->userId();
+        if (!$userId) return;
+
+        $stmt = $db->prepare("UPDATE users SET data = NULL WHERE user_id = ?");
+        $stmt->execute([$userId]);
     }
 
     public static function getState(Nutgram $bot): ?string

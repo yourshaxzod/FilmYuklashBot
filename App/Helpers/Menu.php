@@ -23,6 +23,7 @@ class Menu
 
     public static function showAdminMenu(Nutgram $bot): void
     {
+        State::clearAll($bot);
         State::setScreen($bot, State::ADM_MAIN);
         self::sendMenu($bot, Text::adminMenu(), Keyboard::adminMenu());
     }
@@ -200,7 +201,7 @@ class Menu
     public static function showCategoryManageMenu(Nutgram $bot, PDO $db): void
     {
         State::setScreen($bot, State::ADM_CATEGORY);
-        CategoryService::showCategoryList($bot, $db, true);
+        self::sendMenu($bot, "Kategoriya menyusi!", Keyboard::categoryManageMenu());
     }
 
     public static function showChannelManageMenu(Nutgram $bot, PDO $db): void

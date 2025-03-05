@@ -360,11 +360,18 @@ class Category
     public static function updateUserInterest(PDO $db, int $userId, int $categoryId, float $increment = 0.0): void
     {
         try {
-            $db->beginTransaction();
+            $needsTransaction = !$db->inTransaction();
+
+            if ($needsTransaction) {
+                $db->beginTransaction();
+            }
 
             $category = self::findById($db, $categoryId);
             if (!$category) {
-                throw new Exception("Kategoriya topilmadi");
+                if ($needsTransaction) {
+                    $db->rollBack();
+                }
+                return;
             }
 
             $sql = "SELECT id, score FROM user_interests WHERE user_id = :user_id AND category_id = :category_id";
@@ -377,7 +384,9 @@ class Category
 
             if (!$interest) {
                 if ($increment <= 0) {
-                    $db->rollBack();
+                    if ($needsTransaction) {
+                        $db->rollBack();
+                    }
                     return;
                 }
 
@@ -405,9 +414,13 @@ class Category
                 }
             }
 
-            $db->commit();
+            if ($needsTransaction) {
+                $db->commit();
+            }
         } catch (Exception $e) {
-            $db->rollBack();
+            if ($needsTransaction && $db->inTransaction()) {
+                $db->rollBack();
+            }
             throw new Exception("Foydalanuvchi qiziqishini yangilashda xatolik: " . $e->getMessage());
         }
     }

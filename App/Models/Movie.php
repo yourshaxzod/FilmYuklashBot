@@ -95,23 +95,20 @@ class Movie
             $sql = "
             SELECT 
                 m.*,
-                COUNT(mv.id) as video_count,
-                MAX(CASE WHEN ul.user_id = :user_id THEN 1 ELSE 0 END) as is_liked
+                (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) as video_count,
+                MAX(CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END) as is_liked
             FROM 
                 movies m 
             LEFT JOIN 
-                movie_videos mv ON m.id = mv.movie_id
-            LEFT JOIN 
-                user_likes ul ON m.id = ul.movie_id
+                user_likes ul ON m.id = ul.movie_id AND ul.user_id = :user_id
             WHERE 
                 LOWER(m.title) LIKE LOWER(:query) 
             GROUP BY 
-                m.id, m.title, m.year, m.views, m.likes
-                -- Add all non-aggregated columns from SELECT list to GROUP BY
+                m.id, m.title, m.description, m.year, m.file_id, m.views, m.likes, m.created_at, m.updated_at
             ORDER BY 
                 m.title ASC
             LIMIT :limit OFFSET :offset
-        ";
+            ";
 
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':query', "%$query%", PDO::PARAM_STR);
@@ -610,7 +607,12 @@ class Movie
     public static function toggleLike(PDO $db, int $userId, int $movieId): bool
     {
         try {
-            $db->beginTransaction();
+            // Tranzaksiyani boshlashdan oldin, tranzaksiya allaqachon boshlangan-yo'qligini tekshirish
+            $needsTransaction = !$db->inTransaction();
+
+            if ($needsTransaction) {
+                $db->beginTransaction();
+            }
 
             $stmt = $db->prepare("SELECT id FROM user_likes WHERE user_id = ? AND movie_id = ?");
             $stmt->execute([$userId, $movieId]);
@@ -623,7 +625,9 @@ class Movie
                 $stmt = $db->prepare("UPDATE movies SET likes = likes - 1 WHERE id = ?");
                 $stmt->execute([$movieId]);
 
-                $db->commit();
+                if ($needsTransaction) {
+                    $db->commit();
+                }
                 return false;
             } else {
                 $stmt = $db->prepare("INSERT INTO user_likes (user_id, movie_id, liked_at) VALUES (?, ?, NOW())");
@@ -639,11 +643,15 @@ class Movie
                     Category::updateUserInterest($db, $userId, $category['id'], $increment);
                 }
 
-                $db->commit();
+                if ($needsTransaction) {
+                    $db->commit();
+                }
                 return true;
             }
         } catch (Exception $e) {
-            $db->rollBack();
+            if ($needsTransaction && $db->inTransaction()) {
+                $db->rollBack();
+            }
             throw new Exception("Yoqtirishda xatolik: " . $e->getMessage());
         }
     }
@@ -651,7 +659,11 @@ class Movie
     public static function addView(PDO $db, int $userId, int $movieId): void
     {
         try {
-            $db->beginTransaction();
+            $needsTransaction = !$db->inTransaction();
+
+            if ($needsTransaction) {
+                $db->beginTransaction();
+            }
 
             $sql = "
                 SELECT id 
@@ -679,9 +691,13 @@ class Movie
                 }
             }
 
-            $db->commit();
+            if ($needsTransaction) {
+                $db->commit();
+            }
         } catch (Exception $e) {
-            $db->rollBack();
+            if ($needsTransaction && $db->inTransaction()) {
+                $db->rollBack();
+            }
             throw new Exception("Ko'rishni qo'shishda xatolik: " . $e->getMessage());
         }
     }

@@ -90,8 +90,6 @@ class MovieService
 
             Movie::addView($db, $bot->userId(), $movie['id']);
 
-            TavsiyaService::updateUserInterests($db, $bot->userId(), $movie['id'], 'view');
-
             $videos = Video::getAllByMovieId($db, $movie['id']);
             $videoCount = count($videos);
             $categories = Category::getByMovieId($db, $movie['id']);
