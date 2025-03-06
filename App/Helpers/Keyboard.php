@@ -146,20 +146,6 @@ class Keyboard
             )
         );
 
-        if (!empty($extra['categories'])) {
-            $buttons = [];
-            foreach ($extra['categories'] as $category) {
-                $buttons[] = InlineKeyboardButton::make(
-                    text: "#{$category['name']}",
-                    callback_data: "category_{$category['id']}"
-                );
-            }
-
-            $chunks = array_chunk($buttons, 3);
-            foreach ($chunks as $chunk) {
-                $keyboard->addRow(...$chunk);
-            }
-        }
 
         if ($isAdmin) {
             $keyboard->addRow(
@@ -390,10 +376,6 @@ class Keyboard
                 InlineKeyboardButton::make(
                     text: "✅ Ha",
                     callback_data: "confirm_delete_{$type}_{$id}"
-                ),
-                InlineKeyboardButton::make(
-                    text: "🚫 Yo'q",
-                    callback_data: "cancel_delete_{$type}"
                 )
             );
     }

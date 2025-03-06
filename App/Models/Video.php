@@ -7,7 +7,7 @@ use Exception;
 
 class Video
 {
-    public static function getAllByMovieId(PDO $db, int $movieId, int $limit = 10, int $offset = 0): array
+    public static function getAllByMovieId(PDO $db, int $movieId, int $limit = 10, int $offset = 0)
     {
         try {
             $sql = "
@@ -37,7 +37,7 @@ class Video
         }
     }
 
-    public static function getCountByMovieId(PDO $db, int $movieId): int
+    public static function getCountByMovieId(PDO $db, int $movieId)
     {
         try {
             $sql = "SELECT COUNT(*) FROM movie_videos WHERE movie_id = :movie_id";
@@ -51,7 +51,7 @@ class Video
         }
     }
 
-    public static function findById(PDO $db, int $id): ?array
+    public static function findById(PDO $db, int $id)
     {
         try {
             $sql = "
@@ -83,7 +83,7 @@ class Video
         }
     }
 
-    public static function findByPart(PDO $db, int $movieId, int $partNumber): ?array
+    public static function findByPart(PDO $db, int $movieId, int $partNumber)
     {
         try {
             $sql = "
@@ -116,7 +116,7 @@ class Video
         }
     }
 
-    public static function getNextPartNumber(PDO $db, int $movieId): int
+    public static function getNextPartNumber(PDO $db, int $movieId)
     {
         try {
             $sql = "
@@ -139,7 +139,7 @@ class Video
         }
     }
 
-    public static function getNextVideo(PDO $db, int $movieId, int $currentPartNumber): ?array
+    public static function getNextVideo(PDO $db, int $movieId, int $currentPartNumber)
     {
         try {
             $sql = "
@@ -175,7 +175,7 @@ class Video
         }
     }
 
-    public static function create(PDO $db, array $data): int
+    public static function create(PDO $db, array $data)
     {
         try {
             $db->beginTransaction();
@@ -224,11 +224,9 @@ class Video
         }
     }
 
-    public static function update(PDO $db, int $id, array $data): void
+    public static function update(PDO $db, int $id, array $data)
     {
         try {
-            $db->beginTransaction();
-
             $video = self::findById($db, $id);
             if (!$video) {
                 throw new Exception("Video topilmadi");
@@ -260,19 +258,14 @@ class Video
 
             $stmt = $db->prepare($sql);
             $stmt->execute($values);
-
-            $db->commit();
         } catch (Exception $e) {
-            $db->rollBack();
             throw new Exception("Videoni yangilashda xatolik: " . $e->getMessage());
         }
     }
 
-    public static function delete(PDO $db, int $id): void
+    public static function delete(PDO $db, int $id)
     {
         try {
-            $db->beginTransaction();
-
             $video = self::findById($db, $id);
             if (!$video) {
                 throw new Exception("Video topilmadi");
@@ -282,10 +275,7 @@ class Video
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':id', $id, PDO::PARAM_INT);
             $stmt->execute();
-
-            $db->commit();
         } catch (Exception $e) {
-            $db->rollBack();
             throw new Exception("Videoni o'chirishda xatolik: " . $e->getMessage());
         }
     }

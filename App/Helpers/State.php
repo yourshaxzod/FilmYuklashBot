@@ -26,7 +26,7 @@ class State
     public const ADM_BROADCAST = 'adm_broadcast';
     public const ADM_STATISTIC = 'adm_statistic';
 
-    public static function get(Nutgram $bot, string $key = 'state'): mixed
+    public static function get(Nutgram $bot, string $key = 'state')
     {
         global $db;
 
@@ -45,7 +45,7 @@ class State
         return $data[$key] ?? null;
     }
 
-    public static function set(Nutgram $bot, string $key, $value): void
+    public static function set(Nutgram $bot, string $key, $value)
     {
         global $db;
 
@@ -67,7 +67,7 @@ class State
         $stmt->execute([json_encode($data), $userId]);
     }
 
-    public static function clear(Nutgram $bot, ?array $keys = null): void
+    public static function clear(Nutgram $bot, ?array $keys = null)
     {
         global $db;
 
@@ -96,7 +96,7 @@ class State
         $stmt->execute([json_encode($data), $userId]);
     }
 
-    public static function clearAll(Nutgram $bot): void
+    public static function clearAll(Nutgram $bot)
     {
         global $db;
 
@@ -107,79 +107,79 @@ class State
         $stmt->execute([$userId]);
     }
 
-    public static function getState(Nutgram $bot): ?string
+    public static function getState(Nutgram $bot)
     {
         return self::get($bot, 'state');
     }
 
-    public static function setState(Nutgram $bot, $value): void
+    public static function setState(Nutgram $bot, $value)
     {
         self::set($bot, 'state', $value);
     }
 
-    public static function getScreen(Nutgram $bot): string
+    public static function getScreen(Nutgram $bot)
     {
         return self::get($bot, self::SCREEN);
     }
 
-    public static function setScreen(Nutgram $bot, string $screen): void
+    public static function setScreen(Nutgram $bot, string $screen)
     {
         self::set($bot, self::SCREEN, $screen);
     }
 
 
-    public static function getUserData(Nutgram $bot): array
+    public static function getUserData(Nutgram $bot)
     {
         return $bot->getUserData('data') ?? [];
     }
 
-    public static function startProcess(Nutgram $bot, string $process, array $data = []): void
+    public static function startProcess(Nutgram $bot, string $process, array $data = [])
     {
         self::set($bot, 'process', $process);
         self::set($bot, 'process_data', $data);
         self::set($bot, 'process_step', 0);
     }
 
-    public static function getProcessData(Nutgram $bot): array
+    public static function getProcessData(Nutgram $bot)
     {
         return self::get($bot, 'process_data') ?? [];
     }
 
-    public static function updateProcessData(Nutgram $bot, array $data): void
+    public static function updateProcessData(Nutgram $bot, array $data)
     {
         $currentData = self::getProcessData($bot);
         self::set($bot, 'process_data', array_merge($currentData, $data));
     }
 
-    public static function getProcessStep(Nutgram $bot): int
+    public static function getProcessStep(Nutgram $bot)
     {
         return self::get($bot, 'process_step') ?? 0;
     }
 
-    public static function setProcessStep(Nutgram $bot, int $step): void
+    public static function setProcessStep(Nutgram $bot, int $step)
     {
         self::set($bot, 'process_step', $step);
     }
 
-    public static function nextProcessStep(Nutgram $bot): int
+    public static function nextProcessStep(Nutgram $bot)
     {
         $step = self::getProcessStep($bot) + 1;
         self::setProcessStep($bot, $step);
         return $step;
     }
 
-    public static function endProcess(Nutgram $bot): void
+    public static function endProcess(Nutgram $bot)
     {
         self::clear($bot, ['process', 'process_data', 'process_step']);
     }
 
-    public static function isMovieCreation(Nutgram $bot): bool
+    public static function isMovieCreation(Nutgram $bot)
     {
         $state = self::getState($bot);
         return $state === 'add_movie_confirm' || $state === 'add_movie_photo';
     }
 
-    public static function isInState(Nutgram $bot, string|array $states): bool
+    public static function isInState(Nutgram $bot, string|array $states)
     {
         $currentState = self::getState($bot);
         if (is_array($states)) {

@@ -14,6 +14,7 @@ use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
 class Menu
 {
+    // MAIN MENU
     public static function showMainMenu(Nutgram $bot): void
     {
         State::clearAll($bot);
@@ -21,6 +22,7 @@ class Menu
         self::sendMenu($bot, Text::mainMenu(), Keyboard::mainMenu($bot));
     }
 
+    // ADM MENU
     public static function showAdminMenu(Nutgram $bot): void
     {
         State::clearAll($bot);
@@ -28,6 +30,7 @@ class Menu
         self::sendMenu($bot, Text::adminMenu(), Keyboard::adminMenu());
     }
 
+    // SEARCH MENU
     public static function showSearchMenu(Nutgram $bot): void
     {
         State::setScreen($bot, State::MAIN);
@@ -35,6 +38,7 @@ class Menu
         self::sendMenu($bot, Text::searchMenu(), Keyboard::back());
     }
 
+    // FAVORITE
     public static function showFavoriteMenu(Nutgram $bot, PDO $db, int $page = 1): void
     {
         $userId = $bot->userId();
@@ -42,7 +46,8 @@ class Menu
         $offset = ($page - 1) * $perPage;
 
         $movies = Movie::getLikedMovies($db, $userId, $perPage, $offset);
-        $totalLiked = Movie::getLikedMoviesCount($db, $userId);
+        $totalLiked = count($movies);
+        $totalPages = ceil($totalLiked / $perPage);
 
         if (count($movies) <= 0) {
             self::sendMenu($bot, "😔 <b>Sizda hali sevimli kinolar yo'q.</b>");
@@ -50,8 +55,7 @@ class Menu
         }
 
         $totalPages = ceil($totalLiked / $perPage);
-        $message = "❤️ <b>Sevimli kinolar</b> (sahifa {$page}/{$totalPages})\n\n";
-        $message .= "Sizning sevimli kinolaringiz soni: " . count($movies) . " ta";
+        $message = "❤️ <b>Sevimli kinolaringiz {$totalLiked} ta.</b>\n\n";
 
         $movieButtons = [];
         foreach ($movies as $movie) {
@@ -63,12 +67,12 @@ class Menu
         self::sendMenu($bot, $message, $keyboard);
     }
 
-    public static function showTrendingMenu(Nutgram $bot, PDO $db, int $page = 1): void
+    // TRENDING
+    public static function showTrendingMenu(Nutgram $bot, PDO $db): void
     {
         $perPage = Config::getItemsPerPage();
-        $offset = ($page - 1) * $perPage;
 
-        $trending = Movie::getTrendingMovies($db, $perPage, $bot->userId(), $offset);
+        $trending = Movie::getTrendingMovies($db, $perPage, $bot->userId(), 0);
         $totalMovies = Movie::getCountMovies($db);
 
         if (count($trending) <= 0) {
@@ -76,18 +80,14 @@ class Menu
             return;
         }
 
-        $totalPages = ceil($totalMovies / $perPage);
-        $message = "🔥 <b>Trend kinolar</b> (sahifa {$page}/{$totalPages})\n\n";
-        $message .= "Eng ko'p ko'rilgan va yoqtirilgan kinolar:";
+        $message = "🔥 <b>Trend kinolar</b>\n\n";
 
         $movieButtons = [];
         foreach ($trending as $movie) {
             $movieButtons[] = [Keyboard::getCallbackButton("🎬 {$movie['title']}", "movie_{$movie['id']}")];
         }
 
-        $keyboard = Keyboard::pagination('trending', $page, $totalPages, $movieButtons);
-
-        self::sendMenu($bot, $message, $keyboard);
+        self::sendMenu($bot, $message);
     }
 
     public static function showCategoriesMenu(Nutgram $bot, PDO $db): void
@@ -194,6 +194,7 @@ class Menu
 
     public static function showMovieManageMenu(Nutgram $bot): void
     {
+        State::clear($bot, ['state']);
         State::setScreen($bot, State::ADM_MOVIE);
         self::sendMenu($bot, Text::movieManage(), Keyboard::movieManageMenu());
     }
@@ -201,7 +202,7 @@ class Menu
     public static function showCategoryManageMenu(Nutgram $bot, PDO $db): void
     {
         State::setScreen($bot, State::ADM_CATEGORY);
-        self::sendMenu($bot, "Kategoriya menyusi!", Keyboard::categoryManageMenu());
+        self::sendMenu($bot, Text::categoryManage(), Keyboard::categoryManageMenu());
     }
 
     public static function showChannelManageMenu(Nutgram $bot, PDO $db): void
@@ -242,7 +243,7 @@ class Menu
     public static function showEditMovieGuide(Nutgram $bot): void
     {
         State::setState($bot, 'edit_movie_id');
-        self::sendMenu($bot, Text::editMovie(), Keyboard::movieManageMenu());
+        self::sendMenu($bot, Text::editMovie(), Keyboard::cancel());
     }
 
     public static function showAddCategoryGuide(Nutgram $bot): void

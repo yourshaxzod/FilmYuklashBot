@@ -5,12 +5,12 @@ namespace App\Services;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 use App\Models\Channel;
-use App\Helpers\{Keyboard, Menu, State, Validator, Formatter};
+use App\Helpers\{Keyboard, Menu, Validator};
 use PDO;
 
 class ChannelService
 {
-    public static function showChannels(Nutgram $bot, PDO $db): void
+    public static function showChannels(Nutgram $bot, PDO $db)
     {
         if (!Validator::isAdmin($bot)) {
             Menu::showError($bot, "Sizda yetarli huquq yo'q!");
@@ -47,7 +47,7 @@ class ChannelService
         }
     }
 
-    public static function addChannel(Nutgram $bot, PDO $db, string $username): void
+    public static function addChannel(Nutgram $bot, PDO $db, string $username)
     {
         if (!Validator::isAdmin($bot)) {
             Menu::showError($bot, "Sizda yetarli huquq yo'q!");
@@ -100,7 +100,7 @@ class ChannelService
         }
     }
 
-    public static function deleteChannel(Nutgram $bot, PDO $db, int $channelId): void
+    public static function deleteChannel(Nutgram $bot, PDO $db, int $channelId)
     {
         if (!Validator::isAdmin($bot)) {
             Menu::showError($bot, "Sizda yetarli huquq yo'q!");
@@ -121,7 +121,7 @@ class ChannelService
         }
     }
 
-    public static function toggleChannel(Nutgram $bot, PDO $db, int $channelId): void
+    public static function toggleChannel(Nutgram $bot, PDO $db, int $channelId)
     {
         if (!Validator::isAdmin($bot)) {
             Menu::showError($bot, "Sizda yetarli huquq yo'q!");
@@ -138,7 +138,7 @@ class ChannelService
         }
     }
 
-    public static function showSubscriptionRequirement(Nutgram $bot, PDO $db): bool
+    public static function showSubscriptionRequirement(Nutgram $bot, PDO $db)
     {
         try {
             $notSubscribed = Channel::checkUserSubscription($bot, $db, $bot->userId());
@@ -169,7 +169,7 @@ class ChannelService
         }
     }
 
-    public static function checkSubscription(Nutgram $bot, PDO $db): bool
+    public static function checkSubscription(Nutgram $bot, PDO $db)
     {
         try {
             $notSubscribed = Channel::checkUserSubscription($bot, $db, $bot->userId());

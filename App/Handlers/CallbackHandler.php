@@ -3,7 +3,7 @@
 namespace App\Handlers;
 
 use SergiX44\Nutgram\Nutgram;
-use App\Services\{MovieService, VideoService, StatisticsService, CategoryService, TavsiyaService};
+use App\Services\{MovieService, VideoService, StatisticsService, CategoryService, RecommendationService, TavsiyaService};
 use App\Models\{Movie, Video, Category, Channel};
 use App\Helpers\{Menu, Keyboard, Validator, State};
 use PDO;
@@ -67,7 +67,7 @@ class CallbackHandler
             $isLiked = Movie::toggleLike($db, $bot->userId(), (int)$movieId);
 
             if ($isLiked) {
-                TavsiyaService::updateUserInterests($db, $bot->userId(), (int)$movieId, 'like');
+                RecommendationService::updateUserInterests($db, $bot->userId(), (int)$movieId, 'like');
             }
 
             $movie = Movie::findById($db, (int)$movieId, $bot->userId());
@@ -91,7 +91,7 @@ class CallbackHandler
         });
 
         $bot->onCallbackQueryData('similar_movies_([0-9]+)', function (Nutgram $bot, $movieId) use ($db) {
-            $similarMovies = TavsiyaService::getSimilarMovies($db, (int)$movieId);
+            $similarMovies = RecommendationService::getSimilarMovies($db, (int)$movieId);
 
             if (count($similarMovies) === 0) {
                 $bot->answerCallbackQuery(
@@ -123,22 +123,12 @@ class CallbackHandler
 
     private static function registerVideoCallbacks(Nutgram $bot, PDO $db): void
     {
-        $bot->onCallbackQueryData('play_video_([0-9]+)', function (Nutgram $bot, $videoId) use ($db) {
-            $video = Video::findById($db, (int)$videoId);
-            if (!$video) {
-                $bot->answerCallbackQuery(
-                    text: "⚠️ Video topilmadi",
-                    show_alert: true
-                );
-                return;
-            }
+        $bot->onCallbackQueryData('play {movieID} {videoID}', function (Nutgram $bot, $movieID, $videoID) use ($db) {
+            $video = Video::findByPart($db, $movieID, $videoID);
 
-            VideoService::playVideo($bot, $db, (int)$videoId);
-
-            Movie::addView($db, $bot->userId(), $video['movie_id']);
-            TavsiyaService::updateUserInterests($db, $bot->userId(), $video['movie_id'], 'view');
-
-            $bot->answerCallbackQuery();
+            $bot->sendVideo(
+                video: $video['file_id']
+            );
         });
 
         $bot->onCallbackQueryData('add_video_([0-9]+)', function (Nutgram $bot, $movieId) use ($db) {
@@ -707,15 +697,6 @@ class CallbackHandler
             }
         });
 
-        $bot->onCallbackQueryData('cancel_delete_movie_([0-9]+)', function (Nutgram $bot, $movieId) use ($db) {
-            $movie = Movie::findById($db, (int)$movieId, $bot->userId());
-            if ($movie) {
-                MovieService::showMovie($bot, $db, $movie);
-            }
-
-            $bot->answerCallbackQuery();
-        });
-
         $bot->onCallbackQueryData('refresh_stats', function (Nutgram $bot) use ($db) {
             if (!Validator::isAdmin($bot)) {
                 $bot->answerCallbackQuery(
@@ -800,7 +781,7 @@ class CallbackHandler
             $movieId = (int)$movieId;
             $page = (int)$page;
 
-            VideoService::showVideos($bot, $db, $movieId, $page, Validator::isAdmin($bot));
+            VideoService::showVideos($bot, $db, $movieId, $page);
 
             $bot->answerCallbackQuery();
         });

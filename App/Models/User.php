@@ -12,7 +12,7 @@ use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
 class User
 {
-    public static function register(PDO $db, Nutgram $bot): ?array
+    public static function register(PDO $db, Nutgram $bot)
     {
         try {
             $userId = $bot->userId();
@@ -57,7 +57,7 @@ class User
         }
     }
 
-    public static function findById(PDO $db, int $userId): ?array
+    public static function findById(PDO $db, int $userId)
     {
         try {
             $stmt = $db->prepare("SELECT * FROM users WHERE user_id = ?");
@@ -71,7 +71,7 @@ class User
         }
     }
 
-    public static function update(PDO $db, int $userId, array $data): bool
+    public static function update(PDO $db, int $userId, array $data)
     {
         try {
             $fields = [];
@@ -98,7 +98,7 @@ class User
         }
     }
 
-    public static function block(PDO $db, int $userId): bool
+    public static function block(PDO $db, int $userId)
     {
         try {
             $stmt = $db->prepare("UPDATE users SET status = 'blocked', updated_at = NOW() WHERE user_id = ?");
@@ -111,7 +111,7 @@ class User
         }
     }
 
-    public static function unblock(PDO $db, int $userId): bool
+    public static function unblock(PDO $db, int $userId)
     {
         try {
             $stmt = $db->prepare("UPDATE users SET status = 'active', updated_at = NOW() WHERE user_id = ?");
@@ -124,7 +124,7 @@ class User
         }
     }
 
-    public static function isBlocked(PDO $db, int $userId): bool
+    public static function isBlocked(PDO $db, int $userId)
     {
         try {
             $stmt = $db->prepare("SELECT status FROM users WHERE user_id = ?");
@@ -140,7 +140,7 @@ class User
         }
     }
 
-    public static function getAll(PDO $db, ?string $status = null, int $limit = 100, int $offset = 0): array
+    public static function getAll(PDO $db, ?string $status = null, int $limit = 100, int $offset = 0)
     {
         try {
             $sql = "SELECT * FROM users";
@@ -167,7 +167,7 @@ class User
         }
     }
 
-    public static function getActiveUsersCount(PDO $db, int $days = 7): int
+    public static function getActiveUsersCount(PDO $db, int $days = 7)
     {
         try {
             $sql = "SELECT COUNT(DISTINCT user_id) FROM users WHERE updated_at >= DATE_SUB(NOW(), INTERVAL ? DAY)";
@@ -183,7 +183,7 @@ class User
         }
     }
 
-    public static function getNewUsersCount(PDO $db, int $days = 7): int
+    public static function getNewUsersCount(PDO $db, int $days = 7)
     {
         try {
             $sql = "SELECT COUNT(*) FROM users WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)";
@@ -199,7 +199,7 @@ class User
         }
     }
 
-    public static function getUserStats(PDO $db, int $userId): array
+    public static function getUserStats(PDO $db, int $userId)
     {
         try {
             $stats = [
@@ -261,7 +261,7 @@ class User
         }
     }
 
-    public static function broadcast(Nutgram $bot, PDO $db, string $message, ?array $options = null): array
+    public static function broadcast(Nutgram $bot, PDO $db, string $message, ?array $options = null)
     {
         $results = [
             'total' => 0,

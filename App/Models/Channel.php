@@ -8,7 +8,7 @@ use SergiX44\Nutgram\Nutgram;
 
 class Channel
 {
-    public static function getAll(PDO $db): array
+    public static function getAll(PDO $db)
     {
         try {
             $stmt = $db->query("SELECT * FROM channels ORDER BY created_at DESC");
@@ -18,7 +18,7 @@ class Channel
         }
     }
 
-    public static function getActive(PDO $db): array
+    public static function getActive(PDO $db)
     {
         try {
             $stmt = $db->query("SELECT * FROM channels WHERE is_active = 1 ORDER BY created_at DESC");
@@ -28,7 +28,7 @@ class Channel
         }
     }
 
-    public static function find(PDO $db, int $id): ?array
+    public static function find(PDO $db, int $id)
     {
         try {
             $stmt = $db->prepare("SELECT * FROM channels WHERE id = ?");
@@ -39,7 +39,7 @@ class Channel
         }
     }
 
-    public static function findByUsername(PDO $db, string $username): ?array
+    public static function findByUsername(PDO $db, string $username)
     {
         try {
             $username = ltrim($username, '@');
@@ -52,7 +52,7 @@ class Channel
         }
     }
 
-    public static function findByChatId(PDO $db, int $chatId): ?array
+    public static function findByChatId(PDO $db, int $chatId)
     {
         try {
             $stmt = $db->prepare("SELECT * FROM channels WHERE chat_id = ?");
@@ -63,10 +63,9 @@ class Channel
         }
     }
 
-    public static function create(PDO $db, array $data): int
+    public static function create(PDO $db, array $data)
     {
         try {
-            $db->beginTransaction();
 
             if (isset($data['username'])) {
                 $username = ltrim($data['username'], '@');
@@ -96,20 +95,16 @@ class Channel
             ]);
 
             $channelId = $db->lastInsertId();
-            $db->commit();
 
             return $channelId;
         } catch (Exception $e) {
-            $db->rollBack();
             throw new Exception("Kanal qo'shishda xatolik: " . $e->getMessage());
         }
     }
 
-    public static function update(PDO $db, int $id, array $data): void
+    public static function update(PDO $db, int $id, array $data)
     {
         try {
-            $db->beginTransaction();
-
             $channel = self::find($db, $id);
             if (!$channel) {
                 throw new Exception("Kanal topilmadi");
@@ -144,19 +139,14 @@ class Channel
 
             $stmt = $db->prepare($sql);
             $stmt->execute($values);
-
-            $db->commit();
         } catch (Exception $e) {
-            $db->rollBack();
             throw new Exception("Kanalni yangilashda xatolik: " . $e->getMessage());
         }
     }
 
-    public static function delete(PDO $db, int $id): void
+    public static function delete(PDO $db, int $id)
     {
         try {
-            $db->beginTransaction();
-
             $channel = self::find($db, $id);
             if (!$channel) {
                 throw new Exception("Kanal topilmadi");
@@ -164,19 +154,14 @@ class Channel
 
             $stmt = $db->prepare("DELETE FROM channels WHERE id = ?");
             $stmt->execute([$id]);
-
-            $db->commit();
         } catch (Exception $e) {
-            $db->rollBack();
             throw new Exception("Kanalni o'chirishda xatolik: " . $e->getMessage());
         }
     }
 
-    public static function toggleActive(PDO $db, int $id): bool
+    public static function toggleActive(PDO $db, int $id)
     {
         try {
-            $db->beginTransaction();
-
             $channel = self::find($db, $id);
             if (!$channel) {
                 throw new Exception("Kanal topilmadi");
@@ -186,17 +171,13 @@ class Channel
 
             $stmt = $db->prepare("UPDATE channels SET is_active = ?, updated_at = NOW() WHERE id = ?");
             $stmt->execute([$newStatus, $id]);
-
-            $db->commit();
-
             return $newStatus;
         } catch (Exception $e) {
-            $db->rollBack();
             throw new Exception("Kanal statusini o'zgartirishda xatolik: " . $e->getMessage());
         }
     }
 
-    public static function getCount(PDO $db): int
+    public static function getCount(PDO $db)
     {
         try {
             $stmt = $db->query("SELECT COUNT(*) FROM channels");
@@ -206,7 +187,7 @@ class Channel
         }
     }
 
-    public static function checkUserSubscription(Nutgram $bot, PDO $db, int $userId): array
+    public static function checkUserSubscription(Nutgram $bot, PDO $db, int $userId)
     {
         $channels = self::getActive($db);
         $notSubscribed = [];
@@ -231,7 +212,7 @@ class Channel
         return $notSubscribed;
     }
 
-    public static function checkBotIsAdmin(Nutgram $bot, string $username): ?array
+    public static function checkBotIsAdmin(Nutgram $bot, string $username)
     {
         $username = ltrim($username, '@');
 

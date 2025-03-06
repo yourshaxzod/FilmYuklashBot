@@ -6,28 +6,13 @@ class Text
 {
     public static function mainMenu(): string
     {
-        return "<b>🎬 Salom, Kino Ishqibozi!</b>\n\n" .
-            "🍿 <b>Bu botda eng so'nggi filmlar va seriallarni qidirib topishingiz mumkin.</b>\n\n" .
-            "📌 <b>Foydalanish bo'yicha:</b>\n" .
-            "🔍 <b>Qidirish</b> - Kinolarni qidirish\n" .
-            "❤️ <b>Sevimlilar</b> - Sevimli kinolaringiz\n" .
-            "🔥 <b>Trendlar</b> - Mashhur filmlar\n" .
-            "🏷 <b>Kategoriyalar</b> - Film kategoriyalari\n" .
-            "💫 <b>Tavsiyalar</b> - Sizga maxsus tavsiyalar\n\n" .
-            "🎯 <b>Tugmalardan foydalaning va zavqlaning!</b>";
+        return "<b>👋 Assalomu alaykum, xush kelibsiz!</b>\n\n" .
+            "🍿 <b>Bu botda eng so'nggi filmlar va seriallarni qidirib topishingiz mumkin.</b>";
     }
 
     public static function adminMenu(): string
     {
-        return "🛠 <b>Admin Panel</b>\n\n" .
-            "Quyidagi bo'limlardan birini tanlang:\n\n" .
-            "🎬 <b>Kinolar</b> - Kinolarni boshqarish\n" .
-            "🏷 <b>Kategoriyalar</b> - Kategoriyalarni boshqarish\n" .
-            "🔐 <b>Kanallar</b> - Majburiy obuna kanallarini boshqarish\n" .
-            "📊 <b>Statistika</b> - Bot statistikasini ko'rish\n" .
-            "📬 <b>Xabarlar</b> - Foydalanuvchilarga xabar yuborish\n" .
-            "⚙️ <b>Sozlamalar</b> - Bot sozlamalari\n\n" .
-            "⚙️ <i>Kerakli bo'limni tanlang</i>";
+        return "🛠 <b>Admin Panel</b>\n\n";
     }
 
     public static function searchMenu(): string
@@ -42,86 +27,37 @@ class Text
 
     public static function movieManage(): string
     {
-        return "🎬 <b>Kinolarni boshqarish</b>\n\n" .
-            "Quyidagi amallardan birini tanlang:\n\n" .
-            "➕ <b>Kino qo'shish</b> - Yangi kino qo'shish\n" .
-            "✏️ <b>Kinoni tahrirlash</b> - Mavjud kinoni tahrirlash\n" .
-            "🗑 <b>Kinoni o'chirish</b> - Kinoni o'chirib tashlash\n" .
-            "📋 <b>Kinolar ro'yxati</b> - Barcha kinolar ro'yxati\n" .
-            "📹 <b>Video qismlar</b> - Kino video qismlarini boshqarish\n\n" .
-            "⚙️ <i>Kerakli amalni tanlang</i>";
+        return "🎬 <b>Kinolar.</b>";
     }
 
     public static function categoryManage(): string
     {
-        return "🏷 <b>Kategoriyalarni boshqarish</b>\n\n" .
-            "Quyidagi amallardan birini tanlang:\n\n" .
-            "➕ <b>Kategoriya qo'shish</b> - Yangi kategoriya qo'shish\n" .
-            "✏️ <b>Kategoriyani tahrirlash</b> - Mavjud kategoriyani tahrirlash\n" .
-            "🗑 <b>Kategoriyani o'chirish</b> - Kategoriyani o'chirib tashlash\n" .
-            "📋 <b>Kategoriyalar ro'yxati</b> - Barcha kategoriyalar ro'yxati\n\n" .
-            "⚙️ <i>Kerakli amalni tanlang</i>";
+        return "🎭 <b>Janrlar</b>";
     }
 
     public static function addMovie(): string
     {
-        return "🎬 <b>Yangi kino qo'shish</b>\n\n" .
-            "Quyidagi ma'lumotlarni ketma-ket kiriting:\n\n" .
-            "1. Kino nomi\n" .
-            "2. Kino yili\n" .
-            "3. Kino haqida tavsif\n" .
-            "4. Kino rasmi (poster)\n" .
-            "5. Kino kategoriyalari\n" .
-            "6. Video qismlari\n\n" .
-            "❗️ Har bir bosqichda to'g'ri ma'lumot kiritilishi muhim\n" .
-            "🚫 Bekor qilish uchun \"Bekor qilish\" tugmasini bosing";
+        return "🎬 <b>Kino nomini yozib yuboring.</b>";
     }
 
     public static function editMovie(): string
     {
-        return "✏️ <b>Kinoni tahrirlash</b>\n\n" .
-            "Quyidagi ma'lumotlarni tahrirlay olasiz:\n\n" .
-            "• Kino nomi\n" .
-            "• Kino yili\n" .
-            "• Kino tavsifi\n" .
-            "• Kino rasmi\n" .
-            "• Kino kategoriyalari\n" .
-            "• Video qismlar\n\n" .
-            "❗️ Tahrirlash uchun kinoni tanlang";
+        return "✏️ <b>Tahrirlash uchun kino ID raqamini kiriting.</b>";
     }
 
     public static function addCategory(): string
     {
-        return "🏷 <b>Yangi kategoriya qo'shish</b>\n\n" .
-            "Quyidagi ma'lumotlarni ketma-ket kiriting:\n\n" .
-            "1. Kategoriya nomi (masalan: Komediya)\n" .
-            "2. Kategoriya haqida tavsif (ixtiyoriy)\n\n" .
-            "❗️ Har bir bosqichda to'g'ri ma'lumot kiritilishi muhim\n" .
-            "🚫 Bekor qilish uchun \"Bekor qilish\" tugmasini bosing";
+        return "🎭 <b>Yangi janr nomini yozib yuboring.</b>";
     }
 
     public static function addVideo(array $movie): string
     {
-        return "📹 <b>Video qo'shish</b>\n\n" .
-            "🎬 <b>Kino:</b> {$movie['title']}\n\n" .
-            "Quyidagi ma'lumotlarni ketma-ket kiriting:\n\n" .
-            "1. Video sarlavhasi (masalan: 1-qism)\n" .
-            "2. Qism raqami (masalan: 1)\n" .
-            "3. Video fayl\n\n" .
-            "❗️ Video hajmi 50MB dan oshmasligi kerak\n" .
-            "❗️ Video formati: MP4, MKV, AVI\n" .
-            "🚫 Bekor qilish uchun \"Bekor qilish\" tugmasini bosing";
+        return "📹 <b>Video nomini yozib yuboring.</b>";
     }
 
     public static function addChannel(): string
     {
-        return "📢 <b>Kanal qo'shish</b>\n\n" .
-            "Kanal qo'shish uchun:\n\n" .
-            "1. Bot kanalda admin bo'lishi kerak\n" .
-            "2. Kanal username @ bilan kiriting\n" .
-            "Masalan: @mychannel\n\n" .
-            "❗️ Kanal public bo'lishi shart\n" .
-            "🚫 Bekor qilish uchun \"Bekor qilish\" tugmasini bosing";
+        return "📢 <b>Kanal username'ni yozib yuboring.</b>";
     }
 
     public static function movieInfo(array $movie, int $videoCount, array $categories = [], bool $isAdmin = false): string

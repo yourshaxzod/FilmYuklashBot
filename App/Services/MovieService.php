@@ -5,12 +5,16 @@ namespace App\Services;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 use App\Models\{Movie, Video, Category};
-use App\Helpers\{Formatter, Keyboard, Validator, Menu, State, Text, Config};
+use App\Helpers\{Formatter, Keyboard, Validator, State, Text, Config};
 use PDO;
+use SergiX44\Nutgram\Conversations\InlineMenu;
+use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
+use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
+use SergiX44\Nutgram\Telegram\Types\Keyboard\ReplyKeyboardMarkup;
 
 class MovieService
 {
-    public static function search(Nutgram $bot, PDO $db, string $query, int $page = 1): void
+    public static function search(Nutgram $bot, PDO $db, string $query)
     {
         try {
             $query = trim($query);
@@ -26,9 +30,8 @@ class MovieService
             }
 
             $perPage = Config::getItemsPerPage();
-            $offset = ($page - 1) * $perPage;
 
-            $movies = Movie::searchByText($db, $query, $bot->userId(), $perPage, $offset);
+            $movies = Movie::searchByText($db, $query, $bot->userId(), $perPage, 0);
             $totalFound = Movie::searchCount($db, $query);
 
             if (empty($movies)) {
@@ -44,32 +47,21 @@ class MovieService
                 return;
             }
 
-            $totalPages = ceil($totalFound / $perPage);
-
-            $message = "🔍 <b>Qidiruv natijalari:</b> \"{$query}\" (sahifa {$page}/{$totalPages})\n\n";
+            $message = "🔍 <b>Qidiruv natijalari:</b> {$query}\n\n";
             $message .= "✅ <b>Topildi:</b> {$totalFound} ta kino.\n";
             $message .= "Quyidagilardan birini tanlang:";
 
-            $movieButtons = [];
+            $keyboard = InlineKeyboardMarkup::make();
+
             foreach ($movies as $movie) {
-                $movieButtons[] = [Keyboard::getCallbackButton("🎬 {$movie['title']}", "movie_{$movie['id']}")];
+                $keyboard->addRow(InlineKeyboardButton::make("🎬 {$movie['title']}", "movie_{$movie['id']}"));
             }
 
-            $keyboard = Keyboard::pagination('search', $page, $totalPages, $movieButtons);
-
-            if ($page === 1) {
-                $bot->sendMessage(
-                    text: $message,
-                    parse_mode: ParseMode::HTML,
-                    reply_markup: $keyboard
-                );
-            } else {
-                $bot->editMessageText(
-                    text: $message,
-                    parse_mode: ParseMode::HTML,
-                    reply_markup: $keyboard
-                );
-            }
+            $bot->sendMessage(
+                text: $message,
+                parse_mode: ParseMode::HTML,
+                reply_markup: $keyboard
+            );
         } catch (\Exception $e) {
             $bot->sendMessage(
                 text: "⚠️ Qidirishda xatolik yuz berdi: " . $e->getMessage(),
@@ -78,7 +70,7 @@ class MovieService
         }
     }
 
-    public static function showMovie(Nutgram $bot, PDO $db, $movie): void
+    public static function showMovie(Nutgram $bot, PDO $db, $movie)
     {
         try {
             if (is_int($movie)) {
@@ -124,17 +116,9 @@ class MovieService
         }
     }
 
-    public static function showMoviesList(Nutgram $bot, PDO $db, int $page = 1): void
+    public static function showMoviesList(Nutgram $bot, PDO $db, int $page = 1)
     {
         try {
-            if (!Validator::isAdmin($bot)) {
-                $bot->sendMessage(
-                    text: Text::noPermission(),
-                    reply_markup: Keyboard::mainMenu($bot)
-                );
-                return;
-            }
-
             $perPage = Config::getItemsPerPage();
             $offset = ($page - 1) * $perPage;
 
@@ -152,25 +136,13 @@ class MovieService
             $totalPages = ceil($totalMovies / $perPage);
 
             $message = "📋 <b>Kinolar ro'yxati</b> (sahifa {$page}/{$totalPages})\n\n";
-            $message .= "Jami: {$totalMovies} ta kino\n\n";
+            $message .= "📊 <b>Jami:</b> {$totalMovies} ta.\n\n";
 
             foreach ($movies as $index => $movie) {
                 $message .= ($index + 1) . ". 🆔<b>{$movie['id']}</b> - {$movie['title']} ({$movie['year']})\n";
-                $message .= "   👁 {$movie['views']} | ❤️ {$movie['likes']} | 📹 {$movie['video_count']}\n";
             }
 
-            $buttons = [];
-
-            $buttons[] = [
-                Keyboard::getCallbackButton("➕ Qo'shish", "add_movie"),
-                Keyboard::getCallbackButton("🔄 Yangilash", "refresh_movies_list")
-            ];
-
-            $buttons[] = [
-                Keyboard::getCallbackButton("🔙 Orqaga", "back_to_admin")
-            ];
-
-            $keyboard = Keyboard::pagination('movies_list', $page, $totalPages, $buttons);
+            $keyboard = Keyboard::pagination('movies_list', $page, $totalPages);
 
             if ($page === 1) {
                 $bot->sendMessage(
@@ -193,15 +165,7 @@ class MovieService
         }
     }
 
-    /**
-     * Confirm movie deletion
-     * 
-     * @param Nutgram $bot Bot instance
-     * @param PDO $db Database connection
-     * @param int $movieId Movie ID
-     * @return void
-     */
-    public static function confirmDeleteMovie(Nutgram $bot, PDO $db, int $movieId): void
+    public static function confirmDeleteMovie(Nutgram $bot, PDO $db, int $movieId)
     {
         try {
             if (!Validator::isAdmin($bot)) {
@@ -209,23 +173,19 @@ class MovieService
                 return;
             }
 
-            // Get movie details
             $movie = Movie::findById($db, $movieId);
             if (!$movie) {
                 $bot->sendMessage(text: Text::movieNotFound());
                 return;
             }
 
-            // Get additional data
             $videoCount = Video::getCountByMovieId($db, $movieId);
             $categories = Category::getByMovieId($db, $movieId);
 
-            // Create confirmation message
             $message = "🗑 <b>Kinoni o'chirish</b>\n\n";
             $message .= Text::movieInfo($movie, $videoCount, $categories);
             $message .= "\n\nKinoni o'chirishni tasdiqlaysizmi? Bu amal qaytarib bo'lmaydi va barcha video qismlar ham o'chiriladi!";
 
-            // Update message with confirm buttons
             $bot->editMessageText(
                 text: $message,
                 parse_mode: ParseMode::HTML,
@@ -239,19 +199,11 @@ class MovieService
         }
     }
 
-    /**
-     * Get trending movies for cache
-     * 
-     * @param PDO $db Database connection
-     * @param int $limit Limit
-     * @return array Movies data
-     */
-    public static function getTrendingForCache(PDO $db, int $limit = 10): array
+    public static function getTrendingForCache(PDO $db, int $limit = 10)
     {
         try {
             $movies = Movie::getTrendingMovies($db, $limit);
 
-            // Add categories to movies
             foreach ($movies as &$movie) {
                 $movie['categories'] = Category::getByMovieId($db, $movie['id']);
             }
@@ -263,31 +215,19 @@ class MovieService
         }
     }
 
-    /**
-     * Get recommended movies by user interests
-     * 
-     * @param Nutgram $bot Bot instance 
-     * @param PDO $db Database connection
-     * @param int $limit Limit
-     * @return array Recommended movies
-     */
-    public static function getRecommendedMovies(Nutgram $bot, PDO $db, int $limit = 10): array
+    public static function getRecommendedMovies(Nutgram $bot, PDO $db, int $limit = 10)
     {
         try {
             $userId = $bot->userId();
 
-            // Get user interests
-            $userInterests = TavsiyaService::analyzeUserInterests($db, $userId);
+            $userInterests = RecommendationService::analyzeUserInterests($db, $userId);
 
-            // If user has no interests yet, return trending movies
             if (empty($userInterests['top_categories'])) {
                 return self::getTrendingForCache($db, $limit);
             }
 
-            // Get recommendations
             $recommendations = Movie::getRecommendations($db, $userId, $limit);
 
-            // If no recommendations, return trending movies
             if (empty($recommendations)) {
                 return self::getTrendingForCache($db, $limit);
             }

@@ -5,12 +5,12 @@ namespace App\Services;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 use App\Models\{Movie, Category};
-use App\Helpers\{Formatter, Keyboard, Validator, Menu, State, Text, Config};
+use App\Helpers\{Keyboard, Validator, State, Text, Config};
 use PDO;
 
 class CategoryService
 {
-    public static function showCategoryList(Nutgram $bot, PDO $db, bool $isAdmin = false): void
+    public static function showCategoryList(Nutgram $bot, PDO $db, bool $isAdmin = false)
     {
         try {
             $categories = Category::getAll($db);
@@ -50,7 +50,7 @@ class CategoryService
         }
     }
 
-    public static function showCategoryMovies(Nutgram $bot, PDO $db, int $categoryId, int $page = 1): void
+    public static function showCategoryMovies(Nutgram $bot, PDO $db, int $categoryId, int $page = 1)
     {
         try {
             $category = Category::findById($db, $categoryId);
@@ -130,7 +130,7 @@ class CategoryService
         }
     }
 
-    public static function startEditCategory(Nutgram $bot, PDO $db, int $categoryId): void
+    public static function startEditCategory(Nutgram $bot, PDO $db, int $categoryId)
     {
         try {
             if (!Validator::isAdmin($bot)) {
@@ -176,7 +176,7 @@ class CategoryService
         }
     }
 
-    public static function showCategorySelector(Nutgram $bot, PDO $db, int $movieId): void
+    public static function showCategorySelector(Nutgram $bot, PDO $db, int $movieId)
     {
         try {
             if (!Validator::isAdmin($bot)) {
@@ -231,7 +231,7 @@ class CategoryService
         }
     }
 
-    public static function updateCategorySelector(Nutgram $bot, PDO $db, int $movieId, array $selectedIds): void
+    public static function updateCategorySelector(Nutgram $bot, PDO $db, int $movieId, array $selectedIds)
     {
         try {
             if (!Validator::isAdmin($bot)) {
@@ -275,7 +275,7 @@ class CategoryService
         }
     }
 
-    public static function updateCategorySelectorForCreation(Nutgram $bot, PDO $db, array $selectedIds): void
+    public static function updateCategorySelectorForCreation(Nutgram $bot, PDO $db, array $selectedIds)
     {
         try {
             if (!Validator::isAdmin($bot)) {

@@ -253,6 +253,10 @@ class MessageHandler
                 return true;
 
             case "add_movie_title":
+                if ($text === Button::CANCEL) {
+                    Menu::showMovieManageMenu($bot);
+                    return true;
+                }
                 State::set($bot, "movie_title", $text);
                 State::setState($bot, "add_movie_year");
 
@@ -327,7 +331,10 @@ class MessageHandler
                 return true;
 
             case "edit_movie_id":
-                if (!is_numeric($text)) {
+                if ($text === Button::CANCEL) {
+                    Menu::showMovieManageMenu($bot);
+                    return true;
+                } else if (!is_numeric($text)) {
                     $bot->sendMessage("⚠️ Kino ID raqam bo'lishi kerak!");
                     return true;
                 }
@@ -388,7 +395,6 @@ class MessageHandler
 
                 return true;
 
-                // Movie year edit
             case (preg_match('/^edit_movie_year_(\d+)$/', $state, $matches) ? true : false):
                 $movieId = (int) $matches[1];
                 $year = (int) $text;
@@ -450,7 +456,10 @@ class MessageHandler
                 return true;
 
             case "delete_movie_id":
-                if (!is_numeric($text)) {
+                if ($text === Button::CANCEL) {
+                    Menu::showMovieManageMenu($bot);
+                    return true;
+                } else if (!is_numeric($text)) {
                     $bot->sendMessage("⚠️ Kino ID raqam bo'lishi kerak!");
                     return true;
                 }
@@ -486,9 +495,6 @@ class MessageHandler
         return false;
     }
 
-    /**
-     * Handle video-related states
-     */
     private static function handleVideoStates(
         Nutgram $bot,
         PDO $db,
@@ -526,20 +532,16 @@ class MessageHandler
                 $partNumber = (int) $text;
                 $movieId = State::get($bot, "movie_id");
 
-                try {
-                    $existing = Video::findByPart(
-                        $db,
-                        (int) $movieId,
-                        $partNumber
+                $existing = Video::findByPart(
+                    $db,
+                    (int) $movieId,
+                    $partNumber
+                );
+                if ($existing) {
+                    $bot->sendMessage(
+                        "⚠️ Bu qism raqami allaqachon mavjud. Boshqa raqam kiriting:"
                     );
-                    if ($existing) {
-                        $bot->sendMessage(
-                            "⚠️ Bu qism raqami allaqachon mavjud. Boshqa raqam kiriting:"
-                        );
-                        return true;
-                    }
-                } catch (\Exception $e) {
-                    // Continue if there's an error (likely means no existing part)
+                    return true;
                 }
 
                 State::set($bot, "video_part", (string) $partNumber);
@@ -554,8 +556,6 @@ class MessageHandler
                 }
 
                 return true;
-
-                // Video title edit
             case (preg_match('/^edit_video_title_(\d+)$/', $state, $matches) ? true : false):
                 $videoId = (int) $matches[1];
 
@@ -574,9 +574,7 @@ class MessageHandler
                         throw new \Exception("Video topilmadi");
                     }
 
-                    $bot->sendMessage(
-                        "✅ Video sarlavhasi muvaffaqiyatli yangilandi!"
-                    );
+                    $bot->sendMessage("✅ Video sarlavhasi muvaffaqiyatli yangilandi!");
 
                     VideoService::showVideos(
                         $bot,
@@ -596,7 +594,6 @@ class MessageHandler
 
                 return true;
 
-                // Video part edit
             case (preg_match('/^edit_video_part_(\d+)$/', $state, $matches) ? true : false):
                 $videoId = (int) $matches[1];
 
@@ -631,24 +628,13 @@ class MessageHandler
                         "part_number" => $partNumber,
                     ]);
 
-                    $bot->sendMessage(
-                        "✅ Video qism raqami muvaffaqiyatli yangilandi!"
-                    );
+                    $bot->sendMessage("✅ Video qism raqami muvaffaqiyatli yangilandi!");
 
-                    VideoService::showVideos(
-                        $bot,
-                        $db,
-                        $video["movie_id"],
-                        1,
-                        true
-                    );
+                    VideoService::showVideos($bot, $db, $video["movie_id"], 1);
 
                     State::clearAll($bot);
                 } catch (\Exception $e) {
-                    $bot->sendMessage(
-                        "⚠️ Video qism raqamini yangilashda xatolik: " .
-                            $e->getMessage()
-                    );
+                    $bot->sendMessage("⚠️ Video qism raqamini yangilashda xatolik: " . $e->getMessage());
                 }
 
                 return true;
@@ -657,9 +643,6 @@ class MessageHandler
         return false;
     }
 
-    /**
-     * Handle category-related states
-     */
     private static function handleCategoryStates(
         Nutgram $bot,
         PDO $db,

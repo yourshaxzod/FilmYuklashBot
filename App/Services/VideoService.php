@@ -5,21 +5,15 @@ namespace App\Services;
 use SergiX44\Nutgram\Nutgram;
 use SergiX44\Nutgram\Telegram\Properties\ParseMode;
 use App\Models\{Movie, Video};
-use App\Helpers\{Formatter, Keyboard, Validator, Menu, State, Text, Config};
+use App\Helpers\{Button, Formatter, Keyboard, Validator, State, Text, Config};
 use PDO;
+use SergiX44\Nutgram\Telegram\Types\Input\InputMediaVideo;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardButton;
 use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
 class VideoService
 {
-    /**
-     * Kino uchun videolar ro'yxatini ko'rsatish.
-     * @param Nutgram $bot Telegram bot.
-     * @param PDO $db Database ulanish.
-     * @param int $movieId Kino ID.
-     * @param int $page Sahifa raqami.
-     */
-    public static function showVideos(Nutgram $bot, PDO $db, int $movieId, int $page = 1): void
+    public static function showVideos(Nutgram $bot, PDO $db, int $movieId, int $page = 1)
     {
         try {
             $movie = Movie::findByID($db, $movieId);
@@ -34,45 +28,6 @@ class VideoService
             $perPage = Config::getItemsPerPage();
             $totalVideos = Video::getCountByMovieID($db, $movieId);
 
-            if ($totalVideos === 0) {
-                $message = "😞 <b>{$movie['title']}</b> uchun videolar mavjud emas.";
-
-                if (Validator::isAdmin($bot)) {
-                    $message .= "\n\nAdmin sifatida video qo'shishingiz mumkin!";
-
-                    $bot->sendMessage(
-                        text: $message,
-                        parse_mode: ParseMode::HTML,
-                        reply_markup: InlineKeyboardMarkup::make()
-                            ->addRow(
-                                InlineKeyboardButton::make(
-                                    text: "➕ Video qo'shish",
-                                    callback_data: "add_video_{$movieId}"
-                                )
-                            )
-                            ->addRow(
-                                InlineKeyboardButton::make(
-                                    text: "🔙 Orqaga",
-                                    callback_data: "movie_{$movieId}"
-                                )
-                            )
-                    );
-                } else {
-                    $bot->sendMessage(
-                        text: $message,
-                        parse_mode: ParseMode::HTML,
-                        reply_markup: InlineKeyboardMarkup::make()
-                            ->addRow(
-                                InlineKeyboardButton::make(
-                                    text: "🔙 Orqaga",
-                                    callback_data: "movie_{$movieId}"
-                                )
-                            )
-                    );
-                }
-                return;
-            }
-
             $offset = ($page - 1) * $perPage;
             $videos = Video::getAllByMovieID($db, $movieId, $perPage, $offset);
             $totalPages = ceil($totalVideos / $perPage);
@@ -82,35 +37,31 @@ class VideoService
             $message .= "Kerakli qismni tanlang:";
 
             $videoButtons = [];
+            $rowButtons = [];
+            $count = 0;
+
             foreach ($videos as $video) {
-                $videoButtons[] = [
-                    InlineKeyboardButton::make(
-                        text: "📹 {$video['id']}-qism: {$video['title']}",
-                        callback_data: "play_video_{$video['id']}"
-                    )
-                ];
-            }
+                $buttonText = "📹 {$video['part_number']}-qism";
+                $callbackData = "play {$movieId} {$video['id']}";
 
-            if (Validator::isAdmin($bot)) {
-                $videoButtons[] = [
-                    InlineKeyboardButton::make(
-                        text: "➕ Video qo'shish",
-                        callback_data: "add_video_{$movieId}"
-                    )
-                ];
-            }
+                $rowButtons[] = InlineKeyboardButton::make(
+                    text: $buttonText,
+                    callback_data: $callbackData
+                );
 
-            $videoButtons[] = [
-                InlineKeyboardButton::make(
-                    text: "🔙 Kinoga qaytish",
-                    callback_data: "movie_{$movieId}"
-                )
-            ];
+                $count++;
+
+                if ($count === 3 || $video === end($videos)) {
+                    $videoButtons[] = $rowButtons;
+                    $rowButtons = [];
+                    $count = 0;
+                }
+            }
 
             $keyboard = Keyboard::Pagination("videos_{$movieId}", $page, $totalPages, $videoButtons);
 
-            $bot->sendMessage(
-                text: $message,
+            $bot->editMessageCaption(
+                caption: $message,
                 parse_mode: ParseMode::HTML,
                 reply_markup: $keyboard
             );
@@ -122,88 +73,7 @@ class VideoService
         }
     }
 
-    /**
-     * Videoni yuborish va ijro etish.
-     * @param Nutgram $bot Telegram bot.
-     * @param PDO $db Database ulanish.
-     * @param int $videoId Video ID.
-     */
-    public static function playVideo(Nutgram $bot, PDO $db, int $videoId): void
-    {
-        try {
-            $video = Video::findByID($db, $videoId);
-            if (!$video) {
-                $bot->sendMessage(
-                    text: Text::VideoNotFound(),
-                    reply_markup: Keyboard::MainMenu($bot)
-                );
-                return;
-            }
-
-            $caption = "{$video['movie_title']} - {$video['title']} ({$video['id']}-qism)";
-
-            $bot->sendVideo(
-                video: $video['file_id'],
-                caption: $caption,
-                parse_mode: ParseMode::HTML,
-                supports_streaming: true
-            );
-
-            Movie::addView($db, $bot->userId(), $video['movie_id']);
-
-            $nextVideo = Video::findByID($db, $video['movie_id'], $video['id'] + 1);
-
-            $keyboard = InlineKeyboardMarkup::make();
-
-            if ($nextVideo) {
-                $keyboard->addRow(
-                    InlineKeyboardButton::make(
-                        text: "▶️ Keyingi qismni ko'rish",
-                        callback_data: "play_video_{$nextVideo['id']}"
-                    )
-                );
-
-                $keyboard->addRow(
-                    InlineKeyboardButton::make(
-                        text: "🔙 Kinoga qaytish",
-                        callback_data: "movie_{$video['movie_id']}"
-                    )
-                );
-
-                $bot->sendMessage(
-                    text: "⏭ <b>Keyingi qism:</b> {$nextVideo['id']}-qism",
-                    parse_mode: ParseMode::HTML,
-                    reply_markup: $keyboard
-                );
-            } else {
-                $keyboard->addRow(
-                    InlineKeyboardButton::make(
-                        text: "🔙 Kinoga qaytish",
-                        callback_data: "movie_{$video['movie_id']}"
-                    )
-                );
-
-                $bot->sendMessage(
-                    text: "✅ <b>Bu kinoning so'nggi qismi.</b>",
-                    parse_mode: ParseMode::HTML,
-                    reply_markup: $keyboard
-                );
-            }
-        } catch (\Exception $e) {
-            $bot->sendMessage(
-                text: Text::Error("Videoni ijro etishda xatolik", $e->getMessage()),
-                reply_markup: Keyboard::MainMenu($bot)
-            );
-        }
-    }
-
-    /**
-     * Video qo'shish jarayonini boshlash.
-     * @param Nutgram $bot Telegram bot.
-     * @param PDO $db Database ulanish.
-     * @param int $movieId Kino ID.
-     */
-    public static function startAddVideo(Nutgram $bot, PDO $db, int $movieId): void
+    public static function startAddVideo(Nutgram $bot, PDO $db, int $movieId)
     {
         if (!Validator::isAdmin($bot)) {
             $bot->sendMessage(text: Text::NoPermission());
@@ -242,13 +112,7 @@ class VideoService
         }
     }
 
-    /**
-     * Videoni tahrirlash jarayonini boshlash.
-     * @param Nutgram $bot Telegram bot.
-     * @param PDO $db Database ulanish.
-     * @param int $videoId Video ID.
-     */
-    public static function startEditVideo(Nutgram $bot, PDO $db, int $videoId): void
+    public static function startEditVideo(Nutgram $bot, PDO $db, int $videoId)
     {
         if (!Validator::isAdmin($bot)) {
             $bot->sendMessage(text: Text::NoPermission());
@@ -284,13 +148,7 @@ class VideoService
         }
     }
 
-    /**
-     * Videoni o'chirish.
-     * @param Nutgram $bot Telegram bot.
-     * @param PDO $db Database ulanish.
-     * @param int $videoId Video ID.
-     */
-    public static function deleteVideo(Nutgram $bot, PDO $db, int $videoId): void
+    public static function deleteVideo(Nutgram $bot, PDO $db, int $videoId)
     {
         if (!Validator::isAdmin($bot)) {
             $bot->sendMessage(text: Text::NoPermission());
@@ -322,13 +180,7 @@ class VideoService
         }
     }
 
-    /**
-     * Video sarlavhasini qayta ishlash.
-     * @param Nutgram $bot Telegram bot.
-     * @param PDO $db Database ulanish.
-     * @param string $title Video sarlavhasi.
-     */
-    public static function processVideoTitle(Nutgram $bot, PDO $db, string $title): void
+    public static function processVideoTitle(Nutgram $bot, PDO $db, string $title)
     {
         if (!Validator::isAdmin($bot)) {
             $bot->sendMessage(text: Text::NoPermission());
@@ -370,12 +222,7 @@ class VideoService
         }
     }
 
-    /**
-     * Telegram orqali yuklangan videoni qayta ishlash.
-     * @param Nutgram $bot Telegram bot.
-     * @param PDO $db Database ulanish.
-     */
-    public static function processUploadedVideo(Nutgram $bot, PDO $db): void
+    public static function processUploadedVideo(Nutgram $bot, PDO $db)
     {
         if (!Validator::isAdmin($bot)) {
             $bot->sendMessage(text: Text::NoPermission());
@@ -427,12 +274,7 @@ class VideoService
         }
     }
 
-    /**
-     * Saqlangan video ma'lumotlari bilan video qo'shish.
-     * @param Nutgram $bot Telegram bot.
-     * @param PDO $db Database ulanish.
-     */
-    private static function processStoredVideo(Nutgram $bot, PDO $db): void
+    private static function processStoredVideo(Nutgram $bot, PDO $db)
     {
         try {
             $movieId = (int)$bot->getUserData('movie_id');
@@ -456,14 +298,11 @@ class VideoService
                 'file_id' => $fileId
             ];
 
-            // Videoni bazaga qo'shish
             $videoId = Video::create($db, $videoData);
 
-            // Formatlanishi kerak bo'lgan ma'lumotlar
             $formattedSize = '';
             $formattedDuration = '';
 
-            // Qo'shimcha ma'lumotlarni formatlash
             if ($fileSize = $bot->getUserData('video_file_size')) {
                 $formattedSize = "\n📦 <b>Hajmi:</b> " . Formatter::formatFileSize((int)$fileSize);
             }
@@ -472,7 +311,6 @@ class VideoService
                 $formattedDuration = "\n⏱ <b>Davomiyligi:</b> " . Formatter::formatDuration((int)$duration);
             }
 
-            // Muvaffaqiyat haqida xabar berish
             $message = "✅ Video muvaffaqiyatli qo'shildi!\n\n" .
                 "🎬 <b>Kino:</b> {$movie['title']}\n" .
                 "📹 <b>Video:</b> {$videoTitle}\n" .

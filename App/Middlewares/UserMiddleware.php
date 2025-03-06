@@ -8,7 +8,7 @@ use PDO;
 
 class UserMiddleware
 {
-    public static function register(Nutgram $bot, PDO $db): void
+    public static function register(Nutgram $bot, PDO $db)
     {
         $bot->middleware(function (Nutgram $bot, $next) use ($db) {
             if ($bot->userId()) {

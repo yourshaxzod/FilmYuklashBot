@@ -8,7 +8,7 @@ use App\Helpers\Config;
 
 class Movie
 {
-    public static function getAll(PDO $db, ?int $limit = null, int $offset = 0, ?int $userId = null): array
+    public static function getAll(PDO $db, ?int $limit = null, int $offset = 0, ?int $userId = null)
     {
         try {
             $limit = $limit ?? Config::getItemsPerPage();
@@ -45,7 +45,7 @@ class Movie
         }
     }
 
-    public static function findById(PDO $db, int $id, ?int $userId = null): ?array
+    public static function findById(PDO $db, int $id, ?int $userId = null)
     {
         try {
             $sql = "
@@ -87,7 +87,7 @@ class Movie
         }
     }
 
-    public static function searchByText(PDO $db, string $query, ?int $userId = null, int $limit = 10, int $offset = 0): array
+    public static function searchByText(PDO $db, string $query, ?int $userId = null, int $limit = 10, int $offset = 0)
     {
         try {
             $query = trim($query);
@@ -135,7 +135,7 @@ class Movie
         }
     }
 
-    public static function searchCount(PDO $db, string $query): int
+    public static function searchCount(PDO $db, string $query)
     {
         try {
             $query = trim($query);
@@ -159,7 +159,7 @@ class Movie
         }
     }
 
-    public static function getByCategoryId(PDO $db, int $categoryId, ?int $userId = null, int $limit = 10, int $offset = 0): array
+    public static function getByCategoryId(PDO $db, int $categoryId, ?int $userId = null, int $limit = 10, int $offset = 0)
     {
         try {
             $sql = "
@@ -201,7 +201,7 @@ class Movie
         }
     }
 
-    public static function getCountByCategoryId(PDO $db, int $categoryId): int
+    public static function getCountByCategoryId(PDO $db, int $categoryId)
     {
         try {
             $sql = "
@@ -225,7 +225,7 @@ class Movie
         }
     }
 
-    public static function getCountMovies(PDO $db): int
+    public static function getCountMovies(PDO $db)
     {
         try {
             $stmt = $db->query("SELECT COUNT(*) FROM movies");
@@ -235,7 +235,7 @@ class Movie
         }
     }
 
-    public static function getTrendingMovies(PDO $db, int $limit = 10, ?int $userId = null, int $offset = 0): array
+    public static function getTrendingMovies(PDO $db, int $limit = 10, ?int $userId = null, int $offset = 0)
     {
         try {
             $sql = "
@@ -272,10 +272,9 @@ class Movie
         }
     }
 
-    public static function getRecommendations(PDO $db, int $userId, int $limit = 10, int $offset = 0): array
+    public static function getRecommendations(PDO $db, int $userId, int $limit = 10, int $offset = 0)
     {
         try {
-            // Get viewed movies
             $sql = "SELECT DISTINCT movie_id FROM user_views WHERE user_id = :user_id";
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
@@ -286,7 +285,6 @@ class Movie
 
             $excludeIds = empty($viewedMovieIds) ? "0" : implode(",", $viewedMovieIds);
 
-            // Main recommendations query
             $sql = "
             SELECT 
                 m.*,
@@ -315,7 +313,7 @@ class Movie
 
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
-            $stmt->bindValue(':user_id2', $userId, PDO::PARAM_INT); // Added second binding
+            $stmt->bindValue(':user_id2', $userId, PDO::PARAM_INT);
             $stmt->bindValue(':threshold', $threshold, PDO::PARAM_STR);
             $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
             $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
@@ -327,7 +325,6 @@ class Movie
                 $recommendedMovies[$key]['categories'] = Category::getByMovieId($db, $movie['id']);
             }
 
-            // Fill with trending if needed
             if (count($recommendedMovies) < $limit) {
                 $moreNeeded = $limit - count($recommendedMovies);
                 $existingIds = array_column($recommendedMovies, 'id');
@@ -373,7 +370,7 @@ class Movie
         }
     }
 
-    public static function getRecommendationsCount(PDO $db, int $userId): int
+    public static function getRecommendationsCount(PDO $db, int $userId)
     {
         try {
             $sql = "SELECT DISTINCT movie_id FROM user_views WHERE user_id = :user_id";
@@ -421,7 +418,7 @@ class Movie
         }
     }
 
-    public static function getLikedMovies(PDO $db, int $userId, int $limit = 10, int $offset = 0): array
+    public static function getLikedMovies(PDO $db, int $userId, int $limit = 10, int $offset = 0)
     {
         try {
             $sql = "
@@ -458,7 +455,7 @@ class Movie
         }
     }
 
-    public static function getLikedMoviesCount(PDO $db, int $userId): int
+    public static function getLikedMoviesCount(PDO $db, int $userId)
     {
         try {
             $sql = "SELECT COUNT(*) FROM user_likes WHERE user_id = :user_id";
@@ -472,11 +469,9 @@ class Movie
         }
     }
 
-    public static function create(PDO $db, array $data, array $categoryIds = []): int
+    public static function create(PDO $db, array $data, array $categoryIds = [])
     {
         try {
-            $db->beginTransaction();
-
             $sql = "
             INSERT INTO movies (
                 title, 
@@ -508,19 +503,13 @@ class Movie
 
                 self::saveCategoriesInternal($db, $movieId, $intCategoryIds);
             }
-
-            $db->commit();
-
             return $movieId;
         } catch (Exception $e) {
-            if ($db->inTransaction()) {
-                $db->rollBack();
-            }
             throw new Exception("Kino qo'shishda xatolik: " . $e->getMessage());
         }
     }
 
-    private static function saveCategoriesInternal(PDO $db, int $movieId, array $categoryIds): void
+    private static function saveCategoriesInternal(PDO $db, int $movieId, array $categoryIds)
     {
         try {
             $stmt = $db->prepare("DELETE FROM movie_categories WHERE movie_id = ?");
@@ -545,11 +534,9 @@ class Movie
         }
     }
 
-    public static function update(PDO $db, int $id, array $data, ?array $categoryIds = null): void
+    public static function update(PDO $db, int $id, array $data, ?array $categoryIds = null)
     {
         try {
-            $db->beginTransaction();
-
             $fields = [];
             $values = [];
 
@@ -569,19 +556,14 @@ class Movie
             if ($categoryIds !== null) {
                 Category::saveMovieCategories($db, $id, $categoryIds);
             }
-
-            $db->commit();
         } catch (Exception $e) {
-            $db->rollBack();
             throw new Exception("Kinoni yangilashda xatolik: " . $e->getMessage());
         }
     }
 
-    public static function delete(PDO $db, int $id): void
+    public static function delete(PDO $db, int $id)
     {
         try {
-            $db->beginTransaction();
-
             $stmt = $db->prepare("DELETE FROM movie_videos WHERE movie_id = ?");
             $stmt->execute([$id]);
 
@@ -596,24 +578,14 @@ class Movie
 
             $stmt = $db->prepare("DELETE FROM movies WHERE id = ?");
             $stmt->execute([$id]);
-
-            $db->commit();
         } catch (Exception $e) {
-            $db->rollBack();
             throw new Exception("Kinoni o'chirishda xatolik: " . $e->getMessage());
         }
     }
 
-    public static function toggleLike(PDO $db, int $userId, int $movieId): bool
+    public static function toggleLike(PDO $db, int $userId, int $movieId)
     {
         try {
-            // Tranzaksiyani boshlashdan oldin, tranzaksiya allaqachon boshlangan-yo'qligini tekshirish
-            $needsTransaction = !$db->inTransaction();
-
-            if ($needsTransaction) {
-                $db->beginTransaction();
-            }
-
             $stmt = $db->prepare("SELECT id FROM user_likes WHERE user_id = ? AND movie_id = ?");
             $stmt->execute([$userId, $movieId]);
             $existing = $stmt->fetch();
@@ -625,9 +597,6 @@ class Movie
                 $stmt = $db->prepare("UPDATE movies SET likes = likes - 1 WHERE id = ?");
                 $stmt->execute([$movieId]);
 
-                if ($needsTransaction) {
-                    $db->commit();
-                }
                 return false;
             } else {
                 $stmt = $db->prepare("INSERT INTO user_likes (user_id, movie_id, liked_at) VALUES (?, ?, NOW())");
@@ -643,28 +612,16 @@ class Movie
                     Category::updateUserInterest($db, $userId, $category['id'], $increment);
                 }
 
-                if ($needsTransaction) {
-                    $db->commit();
-                }
                 return true;
             }
         } catch (Exception $e) {
-            if ($needsTransaction && $db->inTransaction()) {
-                $db->rollBack();
-            }
             throw new Exception("Yoqtirishda xatolik: " . $e->getMessage());
         }
     }
 
-    public static function addView(PDO $db, int $userId, int $movieId): void
+    public static function addView(PDO $db, int $userId, int $movieId)
     {
         try {
-            $needsTransaction = !$db->inTransaction();
-
-            if ($needsTransaction) {
-                $db->beginTransaction();
-            }
-
             $sql = "
                 SELECT id 
                 FROM user_views 
@@ -690,14 +647,7 @@ class Movie
                     Category::updateUserInterest($db, $userId, $category['id'], $increment);
                 }
             }
-
-            if ($needsTransaction) {
-                $db->commit();
-            }
         } catch (Exception $e) {
-            if ($needsTransaction && $db->inTransaction()) {
-                $db->rollBack();
-            }
             throw new Exception("Ko'rishni qo'shishda xatolik: " . $e->getMessage());
         }
     }

@@ -8,7 +8,7 @@ use App\Helpers\Config;
 
 class Category
 {
-    public static function getAll(PDO $db, ?int $limit = null, int $offset = 0): array
+    public static function getAll(PDO $db, ?int $limit = null, int $offset = 0)
     {
         try {
             $limit = $limit ?? Config::getItemsPerPage();
@@ -35,7 +35,7 @@ class Category
         }
     }
 
-    public static function findById(PDO $db, int $id): ?array
+    public static function findById(PDO $db, int $id)
     {
         try {
             $sql = "
@@ -64,7 +64,7 @@ class Category
         }
     }
 
-    public static function findBySlug(PDO $db, string $slug): ?array
+    public static function findBySlug(PDO $db, string $slug)
     {
         try {
             $sql = "
@@ -93,7 +93,7 @@ class Category
         }
     }
 
-    public static function findByName(PDO $db, string $name): ?array
+    public static function findByName(PDO $db, string $name)
     {
         try {
             $sql = "
@@ -122,7 +122,7 @@ class Category
         }
     }
 
-    public static function create(PDO $db, array $data): int
+    public static function create(PDO $db, array $data)
     {
         try {
             $db->beginTransaction();
@@ -172,7 +172,7 @@ class Category
         }
     }
 
-    public static function update(PDO $db, int $id, array $data): void
+    public static function update(PDO $db, int $id, array $data)
     {
         try {
             $db->beginTransaction();
@@ -226,7 +226,7 @@ class Category
         }
     }
 
-    public static function delete(PDO $db, int $id): void
+    public static function delete(PDO $db, int $id)
     {
         try {
             $db->beginTransaction();
@@ -252,7 +252,7 @@ class Category
         }
     }
 
-    public static function getCount(PDO $db): int
+    public static function getCount(PDO $db)
     {
         try {
             $stmt = $db->query("SELECT COUNT(*) FROM categories");
@@ -262,7 +262,7 @@ class Category
         }
     }
 
-    public static function getByMovieId(PDO $db, int $movieId): array
+    public static function getByMovieId(PDO $db, int $movieId)
     {
         try {
             $sql = "
@@ -288,7 +288,7 @@ class Category
         }
     }
 
-    public static function saveMovieCategories(PDO $db, int $movieId, array $categoryIds): void
+    public static function saveMovieCategories(PDO $db, int $movieId, array $categoryIds)
     {
         try {
             $shouldCommit = !$db->inTransaction();
@@ -328,7 +328,7 @@ class Category
         }
     }
 
-    public static function getUserTopCategories(PDO $db, int $userId, int $limit = 5): array
+    public static function getUserTopCategories(PDO $db, int $userId, int $limit = 5)
     {
         try {
             $sql = "
@@ -357,7 +357,7 @@ class Category
         }
     }
 
-    public static function updateUserInterest(PDO $db, int $userId, int $categoryId, float $increment = 0.0): void
+    public static function updateUserInterest(PDO $db, int $userId, int $categoryId, float $increment = 0.0)
     {
         try {
             $needsTransaction = !$db->inTransaction();
@@ -425,165 +425,94 @@ class Category
         }
     }
 
-    private static function createSlug(string $name): string
+    private static function createSlug(string $name)
     {
-        $cyrillic = [
-            'а',
-            'б',
-            'в',
-            'г',
-            'д',
-            'е',
-            'ё',
-            'ж',
-            'з',
-            'и',
-            'й',
-            'к',
-            'л',
-            'м',
-            'н',
-            'о',
-            'п',
-            'р',
-            'с',
-            'т',
-            'у',
-            'ф',
-            'х',
-            'ц',
-            'ч',
-            'ш',
-            'щ',
-            'ъ',
-            'ы',
-            'ь',
-            'э',
-            'ю',
-            'я',
-            'А',
-            'Б',
-            'В',
-            'Г',
-            'Д',
-            'Е',
-            'Ё',
-            'Ж',
-            'З',
-            'И',
-            'Й',
-            'К',
-            'Л',
-            'М',
-            'Н',
-            'О',
-            'П',
-            'Р',
-            'С',
-            'Т',
-            'У',
-            'Ф',
-            'Х',
-            'Ц',
-            'Ч',
-            'Ш',
-            'Щ',
-            'Ъ',
-            'Ы',
-            'Ь',
-            'Э',
-            'Ю',
-            'Я',
-            'ў',
-            'қ',
-            'ғ',
-            'ҳ',
-            'Ў',
-            'Қ',
-            'Ғ',
-            'Ҳ'
-        ];
-        $latin = [
-            'a',
-            'b',
-            'v',
-            'g',
-            'd',
-            'e',
-            'yo',
-            'j',
-            'z',
-            'i',
-            'y',
-            'k',
-            'l',
-            'm',
-            'n',
-            'o',
-            'p',
-            'r',
-            's',
-            't',
-            'u',
-            'f',
-            'h',
-            'ts',
-            'ch',
-            'sh',
-            'sch',
-            '',
-            'i',
-            '',
-            'e',
-            'yu',
-            'ya',
-            'A',
-            'B',
-            'V',
-            'G',
-            'D',
-            'E',
-            'Yo',
-            'J',
-            'Z',
-            'I',
-            'Y',
-            'K',
-            'L',
-            'M',
-            'N',
-            'O',
-            'P',
-            'R',
-            'S',
-            'T',
-            'U',
-            'F',
-            'H',
-            'Ts',
-            'Ch',
-            'Sh',
-            'Sch',
-            '',
-            'I',
-            '',
-            'E',
-            'Yu',
-            'Ya',
-            'o',
-            'q',
-            'g',
-            'h',
-            'O',
-            'Q',
-            'G',
-            'H'
-        ];
-        $name = str_replace($cyrillic, $latin, $name);
+        static $transliteration = [
+            'а' => 'a',
+            'б' => 'b',
+            'в' => 'v',
+            'г' => 'g',
+            'д' => 'd',
+            'е' => 'e',
+            'ё' => 'yo',
+            'ж' => 'j',
+            'з' => 'z',
+            'и' => 'i',
+            'й' => 'y',
+            'к' => 'k',
+            'л' => 'l',
+            'м' => 'm',
+            'н' => 'n',
+            'о' => 'o',
+            'п' => 'p',
+            'р' => 'r',
+            'с' => 's',
+            'т' => 't',
+            'у' => 'u',
+            'ф' => 'f',
+            'х' => 'h',
+            'ц' => 'ts',
+            'ч' => 'ch',
+            'ш' => 'sh',
+            'щ' => 'sch',
+            'ъ' => '',
+            'ы' => 'i',
+            'ь' => '',
+            'э' => 'e',
+            'ю' => 'yu',
+            'я' => 'ya',
+            'ў' => 'o',
+            'қ' => 'q',
+            'ғ' => 'g',
+            'ҳ' => 'h',
 
-        $slug = strtolower($name);
+            'А' => 'a',
+            'Б' => 'b',
+            'В' => 'v',
+            'Г' => 'g',
+            'Д' => 'd',
+            'Е' => 'e',
+            'Ё' => 'yo',
+            'Ж' => 'j',
+            'З' => 'z',
+            'И' => 'i',
+            'Й' => 'y',
+            'К' => 'k',
+            'Л' => 'l',
+            'М' => 'm',
+            'Н' => 'n',
+            'О' => 'o',
+            'П' => 'p',
+            'Р' => 'r',
+            'С' => 's',
+            'Т' => 't',
+            'У' => 'u',
+            'Ф' => 'f',
+            'Х' => 'h',
+            'Ц' => 'ts',
+            'Ч' => 'ch',
+            'Ш' => 'sh',
+            'Щ' => 'sch',
+            'Ъ' => '',
+            'Ы' => 'i',
+            'Ь' => '',
+            'Э' => 'e',
+            'Ю' => 'yu',
+            'Я' => 'ya',
+            'Ў' => 'o',
+            'Қ' => 'q',
+            'Ғ' => 'g',
+            'Ҳ' => 'h'
+        ];
+
+        $slug = strtr($name, $transliteration);
+
+        $slug = mb_strtolower($slug, 'UTF-8');
+
         $slug = preg_replace('/[^a-z0-9\s-]/', '', $slug);
+
         $slug = preg_replace('/[\s-]+/', '-', $slug);
+
         $slug = trim($slug, '-');
 
         return $slug;

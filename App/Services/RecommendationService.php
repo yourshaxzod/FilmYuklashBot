@@ -5,39 +5,22 @@ namespace App\Services;
 use PDO;
 use Exception;
 use App\Helpers\Config;
-use App\Models\{Movie, Category, User};
+use App\Models\{Movie, Category};
 
-/**
- * Tavsiya tizimi bilan ishlash uchun xizmat klassi
- */
-class TavsiyaService
+class RecommendationService
 {
-    /**
-     * Tavsiya tizimini ishga tushirish
-     * 
-     * @param PDO $db Database ulanish
-     * @return void
-     */
-    public static function init(PDO $db): void
+    public static function init(PDO $db)
     {
         try {
-            // Tavsiya tizimi uchun zarur jadvallar mavjudligini tekshirish
             self::ensureTablesExist($db);
         } catch (Exception $e) {
             error_log("Tavsiya tizimini ishga tushirishda xatolik: " . $e->getMessage());
         }
     }
 
-    /**
-     * Tavsiya tizimi uchun kerakli jadvallar mavjudligini tekshirish
-     * 
-     * @param PDO $db Database ulanish
-     * @return void
-     */
-    private static function ensureTablesExist(PDO $db): void
+    private static function ensureTablesExist(PDO $db)
     {
         try {
-            // user_interests jadvali mavjudligini tekshirish
             $sql = "
                 SELECT COUNT(*) 
                 FROM information_schema.tables 
@@ -48,7 +31,6 @@ class TavsiyaService
             $exists = (bool)$stmt->fetchColumn();
 
             if (!$exists) {
-                // user_interests jadvalini yaratish
                 $sql = "
                     CREATE TABLE user_interests (
                         id BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -63,7 +45,6 @@ class TavsiyaService
                 ";
                 $db->exec($sql);
 
-                // user_interests indeksi yaratish
                 $sql = "CREATE INDEX idx_user_interests ON user_interests(user_id, score)";
                 $db->exec($sql);
 
@@ -77,27 +58,15 @@ class TavsiyaService
         }
     }
 
-    /**
-     * Foydalanuvchi qiziqishlarini yangilash
-     * (Kino ko'rilganda, yoqtirilganda, qism ko'rilganda)
-     * 
-     * @param PDO $db Database ulanish
-     * @param int $userId Foydalanuvchi ID
-     * @param int $movieId Kino ID
-     * @param string $action Amal turi (view, like)
-     * @return void
-     */
-    public static function updateUserInterests(PDO $db, int $userId, int $movieId, string $action = 'view'): void
+    public static function updateUserInterests(PDO $db, int $userId, int $movieId, string $action = 'view')
     {
         try {
-            // Kino kategoriyalarini olish
             $categories = Category::getByMovieId($db, $movieId);
 
             if (empty($categories)) {
-                return; // Kategoriyalar yo'q bo'lsa, qaytish
+                return;
             }
 
-            // Amal turiga qarab qo'shiladigan bal
             $increment = match ($action) {
                 'like' => Config::getInterestIncrement(),
                 'view' => Config::getInterestIncrement() * 0.5,
@@ -105,10 +74,9 @@ class TavsiyaService
             };
 
             if ($increment <= 0) {
-                return; // Qo'shiladigan bal yo'q bo'lsa, qaytish
+                return;
             }
 
-            // Har bir kategoriya uchun foydalanuvchi qiziqishini yangilash
             foreach ($categories as $category) {
                 Category::updateUserInterest($db, $userId, $category['id'], $increment);
             }
@@ -117,34 +85,23 @@ class TavsiyaService
         }
     }
 
-    /**
-     * Foydalanuvchi qiziqishlarini analiz qilish
-     * 
-     * @param PDO $db Database ulanish
-     * @param int $userId Foydalanuvchi ID
-     * @return array Analiz natijalari
-     */
-    public static function analyzeUserInterests(PDO $db, int $userId): array
+    public static function analyzeUserInterests(PDO $db, int $userId)
     {
         try {
-            // Foydalanuvchi eng ko'p qiziqadigan kategoriyalarni olish
             $topCategories = Category::getUserTopCategories($db, $userId, 5);
 
-            // Foydalanuvchi ko'rgan kinolar soni
             $sql = "SELECT COUNT(DISTINCT movie_id) FROM user_views WHERE user_id = :user_id";
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
             $stmt->execute();
             $viewedMoviesCount = (int)$stmt->fetchColumn();
 
-            // Foydalanuvchi yoqtirgan kinolar soni
             $sql = "SELECT COUNT(*) FROM user_likes WHERE user_id = :user_id";
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
             $stmt->execute();
             $likedMoviesCount = (int)$stmt->fetchColumn();
 
-            // Tavsiya qilingan kinolar soni
             $recommendedMoviesCount = Movie::getRecommendationsCount($db, $userId);
 
             return [
@@ -169,15 +126,7 @@ class TavsiyaService
         }
     }
 
-    /**
-     * Kategoriya bo'yicha foydalanuvchi qiziqishini olish
-     * 
-     * @param PDO $db Database ulanish
-     * @param int $userId Foydalanuvchi ID
-     * @param int $categoryId Kategoriya ID
-     * @return float Qiziqish bali
-     */
-    public static function getUserInterestInCategory(PDO $db, int $userId, int $categoryId): float
+    public static function getUserInterestInCategory(PDO $db, int $userId, int $categoryId)
     {
         try {
             $sql = "SELECT score FROM user_interests WHERE user_id = :user_id AND category_id = :category_id";
@@ -195,14 +144,7 @@ class TavsiyaService
         }
     }
 
-    /**
-     * Qiziqishlar tizimini yuritish uchun muddat qo'yilgan vazifani bajarish
-     * (Cron job orqali chaqiriladi)
-     * 
-     * @param PDO $db Database ulanish
-     * @return array Natijalar
-     */
-    public static function runMaintenance(PDO $db): array
+    public static function runMaintenance(PDO $db)
     {
         try {
             $results = [
@@ -211,13 +153,11 @@ class TavsiyaService
                 'errors' => []
             ];
 
-            // Eski qiziqishlarni tozalash (3 oydan eski)
             $sql = "DELETE FROM user_interests WHERE updated_at < DATE_SUB(NOW(), INTERVAL 3 MONTH)";
             $stmt = $db->prepare($sql);
             $stmt->execute();
             $results['removed_interests'] = $stmt->rowCount();
 
-            // Aktiv bo'lmagan foydalanuvchilar (6 oydan ko'p kirmagan)
             $sql = "UPDATE users SET status = 'inactive' WHERE updated_at < DATE_SUB(NOW(), INTERVAL 6 MONTH)";
             $stmt = $db->prepare($sql);
             $stmt->execute();
@@ -231,30 +171,19 @@ class TavsiyaService
         }
     }
 
-    /**
-     * O'xshash kinolarni topish
-     * 
-     * @param PDO $db Database ulanish
-     * @param int $movieId Kino ID
-     * @param int $limit Natijalar soni
-     * @return array O'xshash kinolar
-     */
-    public static function getSimilarMovies(PDO $db, int $movieId, int $limit = 5): array
+    public static function getSimilarMovies(PDO $db, int $movieId, int $limit = 5)
     {
         try {
-            // Kino kategoriyalarini olish
             $categories = Category::getByMovieId($db, $movieId);
 
             if (empty($categories)) {
-                return []; // Kategoriyalar yo'q bo'lsa, bo'sh massiv qaytarish
+                return [];
             }
 
             $categoryIds = array_column($categories, 'id');
 
-            // Umumiy kategoriyalar soni
             $totalCategories = count($categoryIds);
 
-            // O'xshash kinolarni topish (umumiy kategoriyalar soniga qarab)
             $placeholders = implode(',', array_fill(0, $totalCategories, '?'));
 
             $sql = "
@@ -287,7 +216,6 @@ class TavsiyaService
 
             $movies = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            // Kategoriyalarni qo'shib chiqish
             foreach ($movies as $key => $movie) {
                 $movies[$key]['categories'] = Category::getByMovieId($db, $movie['id']);
             }
