@@ -80,27 +80,6 @@ class Formatter
         return mb_substr($text, 0, $length) . '...';
     }
 
-    public static function escapeHTML(string $text): string
-    {
-        return htmlspecialchars($text, ENT_QUOTES, 'UTF-8');
-    }
-
-    public static function isNumericString($str): bool
-    {
-        if ($str === null || $str === '') {
-            return false;
-        }
-        return ctype_digit((string)$str);
-    }
-
-    public static function stringToInteger($str)
-    {
-        if (self::isNumericString($str)) {
-            return intval($str);
-        }
-        return false;
-    }
-
     public static function formatRating(float $rating): string
     {
         $rating = min(5, max(0, $rating));
@@ -115,22 +94,12 @@ class Formatter
         return $stars . " ({$rating})";
     }
 
-    public static function formatCategories(array $categories): string
-    {
-        if (empty($categories)) {
-            return "Kategoriya belgilanmagan";
-        }
-
-        $categoryNames = array_column($categories, 'name');
-        return '#' . implode(' #', $categoryNames);
-    }
-
     public static function formatTimeAgo(string $timestamp): string
     {
         $time = strtotime($timestamp);
         $now = time();
         $diff = $now - $time;
-        
+
         if ($diff < 60) {
             return "hozirgina";
         } elseif ($diff < 3600) {

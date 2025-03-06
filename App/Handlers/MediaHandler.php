@@ -4,17 +4,21 @@ namespace App\Handlers;
 
 use SergiX44\Nutgram\Nutgram;
 use App\Models\{Category, Movie, Video};
-use App\Services\VideoService;
-use App\Helpers\{State, Formatter, Keyboard, Text, Menu};
+use App\Helpers\{State, Keyboard, Text};
 use App\Services\MovieService;
+use App\Services\VideoService;
 use PDO;
 
 class MediaHandler
 {
+    /**
+     * Register media handlers
+     */
     public static function register(Nutgram $bot, PDO $db): void
     {
+        // Handle photo uploads
         $bot->onPhoto(function (Nutgram $bot) use ($db) {
-            $state = State::get($bot);
+            $state = State::getState($bot);
 
             if (!$state) {
                 return;
@@ -30,21 +34,11 @@ class MediaHandler
                 self::handleMoviePosterEdit($bot, $db, $movieId);
                 return;
             }
-
-            if ($state === 'add_category_image') {
-                self::handleCategoryImageUpload($bot, $db);
-                return;
-            }
-
-            if (preg_match('/^edit_category_image_(\d+)$/', $state, $matches)) {
-                $categoryId = (int)$matches[1];
-                self::handleCategoryImageEdit($bot, $db, $categoryId);
-                return;
-            }
         });
 
+        // Handle video uploads
         $bot->onVideo(function (Nutgram $bot) use ($db) {
-            $state = State::get($bot);
+            $state = State::getState($bot);
             $movieId = State::get($bot, 'movie_id');
 
             if (!$state) {
@@ -63,8 +57,9 @@ class MediaHandler
             }
         });
 
+        // Handle document uploads (for videos)
         $bot->onDocument(function (Nutgram $bot) use ($db) {
-            $state = State::get($bot);
+            $state = State::getState($bot);
             $movieId = State::get($bot, 'movie_id');
 
             if (!$state) {
@@ -90,6 +85,9 @@ class MediaHandler
         });
     }
 
+    /**
+     * Handle movie poster upload
+     */
     private static function handleMoviePosterUpload(Nutgram $bot, PDO $db): void
     {
         $photos = $bot->message()->photo;
@@ -121,6 +119,9 @@ class MediaHandler
         State::set($bot, 'state', 'add_movie_confirm');
     }
 
+    /**
+     * Offer category selection for a new movie
+     */
     private static function offerCategorySelection(Nutgram $bot, PDO $db): void
     {
         try {
@@ -152,6 +153,9 @@ class MediaHandler
         }
     }
 
+    /**
+     * Handle movie poster edit
+     */
     private static function handleMoviePosterEdit(Nutgram $bot, PDO $db, int $movieId): void
     {
         try {
@@ -184,16 +188,9 @@ class MediaHandler
         }
     }
 
-    private static function handleCategoryImageUpload(Nutgram $bot, PDO $db): void
-    {
-        $bot->sendMessage("⚠️ Bu funksiya hozircha mavjud emas.");
-    }
-
-    private static function handleCategoryImageEdit(Nutgram $bot, PDO $db, int $categoryId): void
-    {
-        $bot->sendMessage("⚠️ Bu funksiya hozircha mavjud emas.");
-    }
-
+    /**
+     * Handle video upload
+     */
     private static function handleVideoUpload(Nutgram $bot, PDO $db): void
     {
         try {
@@ -210,7 +207,6 @@ class MediaHandler
             }
 
             $video = $bot->message()->video;
-
             State::set($bot, 'file_id', $video->file_id);
 
             $videoTitle = State::get($bot, 'video_title');
@@ -218,9 +214,9 @@ class MediaHandler
 
             if (empty($videoTitle)) {
                 State::set($bot, 'state', 'add_video_title');
-
+                
                 $nextPart = Video::getNextPartNumber($db, (int)$movieId);
-
+                
                 $bot->sendMessage(
                     text: "🎬 Video qabul qilindi!\n\nEndi video sarlavhasini kiriting (masalan: {$nextPart}-qism):",
                     reply_markup: Keyboard::cancel()
@@ -230,9 +226,9 @@ class MediaHandler
 
             if (empty($videoPart)) {
                 State::set($bot, 'state', 'add_video_part');
-
+                
                 $nextPart = Video::getNextPartNumber($db, (int)$movieId);
-
+                
                 $bot->sendMessage(
                     text: "🔢 Endi video qism raqamini kiriting (masalan: {$nextPart}):",
                     reply_markup: Keyboard::cancel()
@@ -271,6 +267,9 @@ class MediaHandler
         }
     }
 
+    /**
+     * Handle document video upload
+     */
     private static function handleDocumentVideoUpload(Nutgram $bot, PDO $db): void
     {
         try {
@@ -287,7 +286,6 @@ class MediaHandler
             }
 
             $document = $bot->message()->document;
-
             State::set($bot, 'file_id', $document->file_id);
 
             $videoTitle = State::get($bot, 'video_title');
@@ -295,9 +293,9 @@ class MediaHandler
 
             if (empty($videoTitle)) {
                 State::set($bot, 'state', 'add_video_title');
-
+                
                 $nextPart = Video::getNextPartNumber($db, (int)$movieId);
-
+                
                 $bot->sendMessage(
                     text: "🎬 Video qabul qilindi!\n\nEndi video sarlavhasini kiriting (masalan: {$nextPart}-qism):",
                     reply_markup: Keyboard::cancel()
@@ -307,9 +305,9 @@ class MediaHandler
 
             if (empty($videoPart)) {
                 State::set($bot, 'state', 'add_video_part');
-
+                
                 $nextPart = Video::getNextPartNumber($db, (int)$movieId);
-
+                
                 $bot->sendMessage(
                     text: "🔢 Endi video qism raqamini kiriting (masalan: {$nextPart}):",
                     reply_markup: Keyboard::cancel()
@@ -348,6 +346,9 @@ class MediaHandler
         }
     }
 
+    /**
+     * Handle video edit
+     */
     private static function handleVideoEdit(Nutgram $bot, PDO $db, int $videoId): void
     {
         try {
@@ -374,7 +375,7 @@ class MediaHandler
                 reply_markup: Keyboard::mainMenu($bot)
             );
 
-            VideoService::showVideos($bot, $db, $video['movie_id'], 1, true);
+            VideoService::showVideos($bot, $db, $video['movie_id'], true);
 
             State::clearAll($bot);
         } catch (\Exception $e) {
@@ -386,6 +387,9 @@ class MediaHandler
         }
     }
 
+    /**
+     * Handle document video edit
+     */
     private static function handleDocumentVideoEdit(Nutgram $bot, PDO $db, int $videoId): void
     {
         try {
@@ -412,7 +416,7 @@ class MediaHandler
                 reply_markup: Keyboard::mainMenu($bot)
             );
 
-            VideoService::showVideos($bot, $db, $video['movie_id'], 1, true);
+            VideoService::showVideos($bot, $db, $video['movie_id'], true);
 
             State::clearAll($bot);
         } catch (\Exception $e) {

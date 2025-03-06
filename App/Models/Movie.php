@@ -8,10 +8,13 @@ use App\Helpers\Config;
 
 class Movie
 {
-    public static function getAll(PDO $db, ?int $limit = null, int $offset = 0, ?int $userId = null)
+    /**
+     * Get all movies
+     */
+    public static function getAll(PDO $db, ?int $limit = null, int $offset = 0, ?int $userId = null): array
     {
         try {
-            $limit = $limit ?? Config::getItemsPerPage();
+            $limit = $limit ?? Config::get('ITEMS_PER_PAGE');
 
             $sql = "
                 SELECT 
@@ -37,15 +40,19 @@ class Movie
 
             foreach ($movies as $key => $movie) {
                 $movies[$key]['categories'] = Category::getByMovieId($db, $movie['id']);
+                $movies[$key]['is_liked'] = (bool)$movie['is_liked'];
             }
 
             return $movies;
         } catch (Exception $e) {
-            throw new Exception("Kinolarni olishda xatolik: " . $e->getMessage());
+            throw new Exception("Error getting movies: " . $e->getMessage());
         }
     }
 
-    public static function findById(PDO $db, int $id, ?int $userId = null)
+    /**
+     * Find a movie by ID
+     */
+    public static function findById(PDO $db, int $id, ?int $userId = null): ?array
     {
         try {
             $sql = "
@@ -83,38 +90,39 @@ class Movie
 
             return $movie;
         } catch (Exception $e) {
-            throw new Exception("Kinoni olishda xatolik: " . $e->getMessage());
+            throw new Exception("Error finding movie: " . $e->getMessage());
         }
     }
 
-    public static function searchByText(PDO $db, string $query, ?int $userId = null, int $limit = 10, int $offset = 0)
+    /**
+     * Search movies by text
+     */
+    public static function searchByText(PDO $db, string $query, ?int $userId = null): array
     {
         try {
             $query = trim($query);
+            $limit = Config::getSearchResultsLimit();
 
             $sql = "
-            SELECT 
-                m.*,
-                (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) as video_count,
-                MAX(CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END) as is_liked
-            FROM 
-                movies m 
-            LEFT JOIN 
-                user_likes ul ON m.id = ul.movie_id AND ul.user_id = :user_id
-            WHERE 
-                LOWER(m.title) LIKE LOWER(:query) 
-            GROUP BY 
-                m.id, m.title, m.description, m.year, m.file_id, m.views, m.likes, m.created_at, m.updated_at
-            ORDER BY 
-                m.title ASC
-            LIMIT :limit OFFSET :offset
+                SELECT 
+                    m.*,
+                    (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) as video_count,
+                    CASE WHEN ul.id IS NOT NULL THEN 1 ELSE 0 END as is_liked
+                FROM 
+                    movies m 
+                LEFT JOIN 
+                    user_likes ul ON m.id = ul.movie_id AND ul.user_id = :user_id
+                WHERE 
+                    LOWER(m.title) LIKE LOWER(:query) 
+                ORDER BY 
+                    m.title ASC
+                LIMIT :limit
             ";
 
             $stmt = $db->prepare($sql);
-            $stmt->bindValue(':query', "%$query%", PDO::PARAM_STR);
+            $stmt->bindValue(':query', "%{$query}%", PDO::PARAM_STR);
             $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
             $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
             $stmt->execute();
 
             $movies = $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -131,35 +139,14 @@ class Movie
 
             return $movies;
         } catch (Exception $e) {
-            throw new Exception("Qidirishda xatolik: " . $e->getMessage());
+            throw new Exception("Error searching: " . $e->getMessage());
         }
     }
 
-    public static function searchCount(PDO $db, string $query)
-    {
-        try {
-            $query = trim($query);
-
-            $sql = "
-                SELECT 
-                    COUNT(DISTINCT m.id) as count
-                FROM 
-                    movies m 
-                WHERE 
-                    LOWER(m.title) LIKE LOWER(:query)
-            ";
-
-            $stmt = $db->prepare($sql);
-            $stmt->bindValue(':query', "%$query%", PDO::PARAM_STR);
-            $stmt->execute();
-
-            return (int)$stmt->fetchColumn();
-        } catch (Exception $e) {
-            throw new Exception("Qidiruv natijalarini sanashda xatolik: " . $e->getMessage());
-        }
-    }
-
-    public static function getByCategoryId(PDO $db, int $categoryId, ?int $userId = null, int $limit = 10, int $offset = 0)
+    /**
+     * Get movies by category ID
+     */
+    public static function getByCategoryId(PDO $db, int $categoryId, ?int $userId = null, int $limit = 10): array
     {
         try {
             $sql = "
@@ -179,29 +166,32 @@ class Movie
                     m.id
                 ORDER BY 
                     m.created_at DESC
-                LIMIT :limit OFFSET :offset
+                LIMIT :limit
             ";
 
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':category_id', $categoryId, PDO::PARAM_INT);
             $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
             $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
             $stmt->execute();
 
             $movies = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             foreach ($movies as $key => $movie) {
                 $movies[$key]['categories'] = Category::getByMovieId($db, $movie['id']);
+                $movies[$key]['is_liked'] = (bool)$movie['is_liked'];
             }
 
             return $movies;
         } catch (Exception $e) {
-            throw new Exception("Kategoriya kinolarini olishda xatolik: " . $e->getMessage());
+            throw new Exception("Error getting category movies: " . $e->getMessage());
         }
     }
 
-    public static function getCountByCategoryId(PDO $db, int $categoryId)
+    /**
+     * Get count of movies by category ID
+     */
+    public static function getCountByCategoryId(PDO $db, int $categoryId): int
     {
         try {
             $sql = "
@@ -221,21 +211,27 @@ class Movie
 
             return (int)$stmt->fetchColumn();
         } catch (Exception $e) {
-            throw new Exception("Kategoriya kinolarini sanashda xatolik: " . $e->getMessage());
+            throw new Exception("Error counting category movies: " . $e->getMessage());
         }
     }
 
-    public static function getCountMovies(PDO $db)
+    /**
+     * Get total count of movies
+     */
+    public static function getCountMovies(PDO $db): int
     {
         try {
             $stmt = $db->query("SELECT COUNT(*) FROM movies");
             return (int)$stmt->fetchColumn();
         } catch (Exception $e) {
-            throw new Exception("Kinolar sonini olishda xatolik: " . $e->getMessage());
+            throw new Exception("Error getting movies count: " . $e->getMessage());
         }
     }
 
-    public static function getTrendingMovies(PDO $db, int $limit = 10, ?int $userId = null, int $offset = 0)
+    /**
+     * Get trending movies
+     */
+    public static function getTrendingMovies(PDO $db, int $limit = 10, ?int $userId = null): array
     {
         try {
             $sql = "
@@ -251,12 +247,11 @@ class Movie
                     (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) > 0
                 ORDER BY 
                     (m.views * 0.7 + m.likes * 0.3) DESC, m.created_at DESC
-                LIMIT :limit OFFSET :offset
+                LIMIT :limit
             ";
 
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
             $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
             $stmt->execute();
 
@@ -264,91 +259,101 @@ class Movie
 
             foreach ($movies as $key => $movie) {
                 $movies[$key]['categories'] = Category::getByMovieId($db, $movie['id']);
+                $movies[$key]['is_liked'] = (bool)$movie['is_liked'];
             }
 
             return $movies;
         } catch (Exception $e) {
-            throw new Exception("Trend kinolarni olishda xatolik: " . $e->getMessage());
+            throw new Exception("Error getting trending movies: " . $e->getMessage());
         }
     }
 
-    public static function getRecommendations(PDO $db, int $userId, int $limit = 10, int $offset = 0)
+    /**
+     * Get personalized recommendations
+     */
+    public static function getRecommendations(PDO $db, int $userId, int $limit = 5): array
     {
         try {
+            // Get movies the user has already viewed
             $sql = "SELECT DISTINCT movie_id FROM user_views WHERE user_id = :user_id";
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
             $stmt->execute();
             $viewedMovieIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
 
+            // If no movies viewed yet, return empty array
+            if (empty($viewedMovieIds)) {
+                return self::getTrendingMovies($db, $limit, $userId);
+            }
+
             $threshold = Config::getRecommendationThreshold();
 
-            $excludeIds = empty($viewedMovieIds) ? "0" : implode(",", $viewedMovieIds);
+            // Exclude already viewed movies
+            $excludeIds = implode(",", array_map('intval', $viewedMovieIds));
+
+            // If no viewed movies yet, just use 0 as a placeholder for exclusion
+            if (empty($excludeIds)) {
+                $excludeIds = "0";
+            }
 
             $sql = "
-            SELECT 
-                m.*,
-                (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) as video_count,
-                IF(ul.id IS NOT NULL, 1, 0) as is_liked,
-                AVG(ui.score) as recommendation_score
-            FROM 
-                movies m
-            JOIN 
-                movie_categories mc ON m.id = mc.movie_id
-            JOIN 
-                user_interests ui ON mc.category_id = ui.category_id AND ui.user_id = :user_id
-            LEFT JOIN 
-                user_likes ul ON m.id = ul.movie_id AND ul.user_id = :user_id2
-            WHERE 
-                m.id NOT IN ({$excludeIds})
-                AND (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) > 0
-            GROUP BY 
-                m.id, m.title, m.description, m.year, m.file_id, m.views, m.likes, m.created_at, m.updated_at, ul.id
-            HAVING 
-                AVG(ui.score) >= :threshold
-            ORDER BY 
-                recommendation_score DESC, m.created_at DESC
-            LIMIT :limit OFFSET :offset
-        ";
+                SELECT 
+                    m.*,
+                    (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) as video_count,
+                    IF(ul.id IS NOT NULL, 1, 0) as is_liked,
+                    AVG(ui.score) as recommendation_score
+                FROM 
+                    movies m
+                JOIN 
+                    movie_categories mc ON m.id = mc.movie_id
+                JOIN 
+                    user_interests ui ON mc.category_id = ui.category_id AND ui.user_id = :user_id
+                LEFT JOIN 
+                    user_likes ul ON m.id = ul.movie_id AND ul.user_id = :user_id2
+                WHERE 
+                    m.id NOT IN ({$excludeIds})
+                    AND (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) > 0
+                GROUP BY 
+                    m.id
+                HAVING 
+                    AVG(ui.score) >= :threshold
+                ORDER BY 
+                    recommendation_score DESC, m.created_at DESC
+                LIMIT :limit
+            ";
 
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
             $stmt->bindValue(':user_id2', $userId, PDO::PARAM_INT);
             $stmt->bindValue(':threshold', $threshold, PDO::PARAM_STR);
             $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
             $stmt->execute();
 
-            $recommendedMovies = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            $recommendations = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-            foreach ($recommendedMovies as $key => $movie) {
-                $recommendedMovies[$key]['categories'] = Category::getByMovieId($db, $movie['id']);
-            }
-
-            if (count($recommendedMovies) < $limit) {
-                $moreNeeded = $limit - count($recommendedMovies);
-                $existingIds = array_column($recommendedMovies, 'id');
-                $excludeIds = array_merge($viewedMovieIds, $existingIds);
-                $excludeIdsStr = empty($excludeIds) ? "0" : implode(",", $excludeIds);
+            // If not enough recommendations, supplement with trending movies
+            if (count($recommendations) < $limit) {
+                $moreNeeded = $limit - count($recommendations);
+                $existingIds = array_column($recommendations, 'id');
+                $allExcludeIds = array_merge($viewedMovieIds, $existingIds);
+                $excludeStr = empty($allExcludeIds) ? "0" : implode(",", array_map('intval', $allExcludeIds));
 
                 $sql = "
-                SELECT 
-                    m.*,
-                    (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) as video_count,
-                    IF(ul.id IS NOT NULL, 1, 0) as is_liked
-                FROM 
-                    movies m 
-                LEFT JOIN 
-                    user_likes ul ON m.id = ul.movie_id AND ul.user_id = :user_id
-                WHERE 
-                    m.id NOT IN ({$excludeIdsStr})
-                    AND (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) > 0
-                GROUP BY
-                    m.id, m.title, m.description, m.year, m.file_id, m.views, m.likes, m.created_at, m.updated_at, ul.id
-                ORDER BY 
-                    (m.views * 0.7 + m.likes * 0.3) DESC, m.created_at DESC
-                LIMIT :limit
-            ";
+                    SELECT 
+                        m.*,
+                        (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) as video_count,
+                        IF(ul.id IS NOT NULL, 1, 0) as is_liked
+                    FROM 
+                        movies m 
+                    LEFT JOIN 
+                        user_likes ul ON m.id = ul.movie_id AND ul.user_id = :user_id
+                    WHERE 
+                        m.id NOT IN ({$excludeStr})
+                        AND (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) > 0
+                    ORDER BY 
+                        (m.views * 0.7 + m.likes * 0.3) DESC, m.created_at DESC
+                    LIMIT :limit
+                ";
 
                 $stmt = $db->prepare($sql);
                 $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
@@ -356,69 +361,28 @@ class Movie
                 $stmt->execute();
 
                 $trendingMovies = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
-                foreach ($trendingMovies as $key => $movie) {
-                    $trendingMovies[$key]['categories'] = Category::getByMovieId($db, $movie['id']);
-                }
-
-                $recommendedMovies = array_merge($recommendedMovies, $trendingMovies);
+                $recommendations = array_merge($recommendations, $trendingMovies);
             }
 
-            return $recommendedMovies;
+            // Enrich with categories
+            foreach ($recommendations as $key => $movie) {
+                $recommendations[$key]['categories'] = Category::getByMovieId($db, $movie['id']);
+                $recommendations[$key]['is_liked'] = (bool)$movie['is_liked'];
+            }
+
+            return $recommendations;
         } catch (Exception $e) {
-            throw new Exception("Tavsiyalarni olishda xatolik: " . $e->getMessage());
+            if (Config::isDebugMode()) {
+                error_log("Error getting recommendations: " . $e->getMessage());
+            }
+            return [];
         }
     }
 
-    public static function getRecommendationsCount(PDO $db, int $userId)
-    {
-        try {
-            $sql = "SELECT DISTINCT movie_id FROM user_views WHERE user_id = :user_id";
-            $stmt = $db->prepare($sql);
-            $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
-            $stmt->execute();
-            $viewedMovieIds = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-            $threshold = Config::getRecommendationThreshold();
-
-            $excludeIds = empty($viewedMovieIds) ? "0" : implode(",", $viewedMovieIds);
-
-            $sql = "
-            SELECT 
-                COUNT(DISTINCT m.id) as count
-            FROM 
-                movies m
-            JOIN 
-                movie_categories mc ON m.id = mc.movie_id
-            JOIN 
-                user_interests ui ON mc.category_id = ui.category_id
-            WHERE 
-                ui.user_id = :user_id
-                AND m.id NOT IN ({$excludeIds})
-                AND (SELECT COUNT(*) FROM movie_videos WHERE movie_id = m.id) > 0
-                AND (
-                    SELECT AVG(score) 
-                    FROM user_interests 
-                    WHERE user_id = :user_id2
-                    AND category_id IN (
-                        SELECT category_id FROM movie_categories WHERE movie_id = m.id
-                    )
-                ) >= :threshold
-        ";
-
-            $stmt = $db->prepare($sql);
-            $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
-            $stmt->bindValue(':user_id2', $userId, PDO::PARAM_INT);
-            $stmt->bindValue(':threshold', $threshold, PDO::PARAM_STR);
-            $stmt->execute();
-
-            return (int)$stmt->fetchColumn();
-        } catch (Exception $e) {
-            throw new Exception("Tavsiyalar sonini olishda xatolik: " . $e->getMessage());
-        }
-    }
-
-    public static function getLikedMovies(PDO $db, int $userId, int $limit = 10, int $offset = 0)
+    /**
+     * Get liked movies
+     */
+    public static function getLikedMovies(PDO $db, int $userId, int $limit = 10): array
     {
         try {
             $sql = "
@@ -434,28 +398,31 @@ class Movie
                     ul.user_id = :user_id
                 ORDER BY 
                     ul.liked_at DESC
-                LIMIT :limit OFFSET :offset
+                LIMIT :limit
             ";
 
             $stmt = $db->prepare($sql);
             $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
             $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
             $stmt->execute();
 
             $movies = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
             foreach ($movies as $key => $movie) {
                 $movies[$key]['categories'] = Category::getByMovieId($db, $movie['id']);
+                $movies[$key]['is_liked'] = true;
             }
 
             return $movies;
         } catch (Exception $e) {
-            throw new Exception("Sevimli kinolarni olishda xatolik: " . $e->getMessage());
+            throw new Exception("Error getting liked movies: " . $e->getMessage());
         }
     }
 
-    public static function getLikedMoviesCount(PDO $db, int $userId)
+    /**
+     * Get count of liked movies
+     */
+    public static function getLikedMoviesCount(PDO $db, int $userId): int
     {
         try {
             $sql = "SELECT COUNT(*) FROM user_likes WHERE user_id = :user_id";
@@ -465,28 +432,33 @@ class Movie
 
             return (int)$stmt->fetchColumn();
         } catch (Exception $e) {
-            throw new Exception("Sevimli kinolar sonini olishda xatolik: " . $e->getMessage());
+            throw new Exception("Error getting liked movies count: " . $e->getMessage());
         }
     }
 
-    public static function create(PDO $db, array $data, array $categoryIds = [])
+    /**
+     * Create a new movie
+     */
+    public static function create(PDO $db, array $data, array $categoryIds = []): int
     {
         try {
+            $db->beginTransaction();
+
             $sql = "
-            INSERT INTO movies (
-                title, 
-                description, 
-                year, 
-                file_id, 
-                created_at
-            ) VALUES (
-                :title, 
-                :description, 
-                :year, 
-                :file_id, 
-                NOW()
-            )
-        ";
+                INSERT INTO movies (
+                    title, 
+                    description, 
+                    year, 
+                    file_id,
+                    created_at
+                ) VALUES (
+                    :title, 
+                    :description, 
+                    :year, 
+                    :file_id,
+                    NOW()
+                )
+            ";
 
             $stmt = $db->prepare($sql);
             $stmt->execute([
@@ -500,43 +472,27 @@ class Movie
 
             if (!empty($categoryIds)) {
                 $intCategoryIds = array_map('intval', $categoryIds);
-
-                self::saveCategoriesInternal($db, $movieId, $intCategoryIds);
+                Category::saveMovieCategories($db, $movieId, $intCategoryIds);
             }
+
+            $db->commit();
             return $movieId;
         } catch (Exception $e) {
-            throw new Exception("Kino qo'shishda xatolik: " . $e->getMessage());
-        }
-    }
-
-    private static function saveCategoriesInternal(PDO $db, int $movieId, array $categoryIds)
-    {
-        try {
-            $stmt = $db->prepare("DELETE FROM movie_categories WHERE movie_id = ?");
-            $stmt->execute([$movieId]);
-
-            if (!empty($categoryIds)) {
-                $values = [];
-                $placeholders = [];
-
-                foreach ($categoryIds as $categoryId) {
-                    $values[] = $movieId;
-                    $values[] = $categoryId;
-                    $placeholders[] = "(?, ?)";
-                }
-
-                $sql = "INSERT INTO movie_categories (movie_id, category_id) VALUES " . implode(", ", $placeholders);
-                $stmt = $db->prepare($sql);
-                $stmt->execute($values);
+            if ($db->inTransaction()) {
+                $db->rollBack();
             }
-        } catch (Exception $e) {
-            throw new Exception("Kino kategoriyalarini saqlashda xatolik: " . $e->getMessage());
+            throw new Exception("Error adding movie: " . $e->getMessage());
         }
     }
 
-    public static function update(PDO $db, int $id, array $data, ?array $categoryIds = null)
+    /**
+     * Update a movie
+     */
+    public static function update(PDO $db, int $id, array $data, ?array $categoryIds = null): bool
     {
         try {
+            $db->beginTransaction();
+
             $fields = [];
             $values = [];
 
@@ -556,14 +512,25 @@ class Movie
             if ($categoryIds !== null) {
                 Category::saveMovieCategories($db, $id, $categoryIds);
             }
+
+            $db->commit();
+            return true;
         } catch (Exception $e) {
-            throw new Exception("Kinoni yangilashda xatolik: " . $e->getMessage());
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw new Exception("Error updating movie: " . $e->getMessage());
         }
     }
 
-    public static function delete(PDO $db, int $id)
+    /**
+     * Delete a movie
+     */
+    public static function delete(PDO $db, int $id): bool
     {
         try {
+            $db->beginTransaction();
+
             $stmt = $db->prepare("DELETE FROM movie_videos WHERE movie_id = ?");
             $stmt->execute([$id]);
 
@@ -578,33 +545,59 @@ class Movie
 
             $stmt = $db->prepare("DELETE FROM movies WHERE id = ?");
             $stmt->execute([$id]);
+
+            $db->commit();
+            return true;
         } catch (Exception $e) {
-            throw new Exception("Kinoni o'chirishda xatolik: " . $e->getMessage());
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw new Exception("Error deleting movie: " . $e->getMessage());
         }
     }
 
-    public static function toggleLike(PDO $db, int $userId, int $movieId)
+    /**
+     * Toggle like for a movie
+     */
+    public static function toggleLike(PDO $db, int $userId, int $movieId): bool
     {
         try {
+            $db->beginTransaction();
+
             $stmt = $db->prepare("SELECT id FROM user_likes WHERE user_id = ? AND movie_id = ?");
             $stmt->execute([$userId, $movieId]);
             $existing = $stmt->fetch();
 
             if ($existing) {
+                // Unlike
                 $stmt = $db->prepare("DELETE FROM user_likes WHERE user_id = ? AND movie_id = ?");
                 $stmt->execute([$userId, $movieId]);
 
                 $stmt = $db->prepare("UPDATE movies SET likes = likes - 1 WHERE id = ?");
                 $stmt->execute([$movieId]);
 
+                $db->commit();
                 return false;
             } else {
+                // Check if user has reached max likes
+                $maxLikes = Config::getMaxLikesPerUser();
+                $stmt = $db->prepare("SELECT COUNT(*) FROM user_likes WHERE user_id = ?");
+                $stmt->execute([$userId]);
+                $currentLikes = (int)$stmt->fetchColumn();
+
+                if ($currentLikes >= $maxLikes) {
+                    $db->rollBack();
+                    throw new Exception("Maksimal yoqtirish chegarasiga ({$maxLikes}) yetdingiz.");
+                }
+
+                // Like
                 $stmt = $db->prepare("INSERT INTO user_likes (user_id, movie_id, liked_at) VALUES (?, ?, NOW())");
                 $stmt->execute([$userId, $movieId]);
 
                 $stmt = $db->prepare("UPDATE movies SET likes = likes + 1 WHERE id = ?");
                 $stmt->execute([$movieId]);
 
+                // Update user interests
                 $movieCategories = Category::getByMovieId($db, $movieId);
                 $increment = Config::getInterestIncrement();
 
@@ -612,16 +605,26 @@ class Movie
                     Category::updateUserInterest($db, $userId, $category['id'], $increment);
                 }
 
+                $db->commit();
                 return true;
             }
         } catch (Exception $e) {
-            throw new Exception("Yoqtirishda xatolik: " . $e->getMessage());
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw new Exception($e->getMessage());
         }
     }
 
-    public static function addView(PDO $db, int $userId, int $movieId)
+    /**
+     * Add a view to a movie
+     */
+    public static function addView(PDO $db, int $userId, int $movieId): void
     {
         try {
+            $db->beginTransaction();
+
+            // Check if the user has viewed this movie recently (within 24 hours)
             $sql = "
                 SELECT id 
                 FROM user_views 
@@ -634,21 +637,32 @@ class Movie
             $recentView = $stmt->fetch();
 
             if (!$recentView) {
+                // Add a new view record
                 $stmt = $db->prepare("INSERT INTO user_views (user_id, movie_id, viewed_at) VALUES (?, ?, NOW())");
                 $stmt->execute([$userId, $movieId]);
 
+                // Increment the movie's view count
                 $stmt = $db->prepare("UPDATE movies SET views = views + 1 WHERE id = ?");
                 $stmt->execute([$movieId]);
 
+                // Update user interests
                 $movieCategories = Category::getByMovieId($db, $movieId);
-                $increment = Config::getInterestIncrement() * 0.5;
+                $increment = Config::getInterestIncrement() * 0.5; // Half the interest increment for views
 
                 foreach ($movieCategories as $category) {
                     Category::updateUserInterest($db, $userId, $category['id'], $increment);
                 }
             }
+
+            $db->commit();
         } catch (Exception $e) {
-            throw new Exception("Ko'rishni qo'shishda xatolik: " . $e->getMessage());
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+
+            if (Config::isDebugMode()) {
+                error_log("Error adding view: " . $e->getMessage());
+            }
         }
     }
 }

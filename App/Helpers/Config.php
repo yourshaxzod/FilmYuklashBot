@@ -9,7 +9,6 @@ use Dotenv\Dotenv;
 class Config
 {
     private static bool $loaded = false;
-
     private static array $cache = [];
 
     public static function load(): void
@@ -36,6 +35,9 @@ class Config
             'RECOMMENDATION_THRESHOLD' => (float)($_ENV['RECOMMENDATION_THRESHOLD'] ?? 0.5),
             'INTEREST_INCREMENT' => (float)($_ENV['INTEREST_INCREMENT'] ?? 0.2),
             'MAX_INTEREST_SCORE' => (float)($_ENV['MAX_INTEREST_SCORE'] ?? 5.0),
+            'MAX_LIKES_PER_USER' => (int)($_ENV['MAX_LIKES_PER_USER'] ?? 10),
+            'SEARCH_RESULTS_LIMIT' => (int)($_ENV['SEARCH_RESULTS_LIMIT'] ?? 5),
+            'RECOMMENDATION_COUNT' => (int)($_ENV['RECOMMENDATION_COUNT'] ?? 5)
         ];
 
         self::$loaded = true;
@@ -58,9 +60,19 @@ class Config
         return array_map('intval', array_filter(explode(',', $ids)));
     }
 
-    public static function getItemsPerPage(): int
+    public static function getMaxLikesPerUser(): int
     {
-        return self::get('ITEMS_PER_PAGE', 10);
+        return self::get('MAX_LIKES_PER_USER', 10);
+    }
+
+    public static function getSearchResultsLimit(): int
+    {
+        return self::get('SEARCH_RESULTS_LIMIT', 5);
+    }
+
+    public static function getRecommendationCount(): int
+    {
+        return self::get('RECOMMENDATION_COUNT', 5);
     }
 
     public static function isDebugMode(): bool

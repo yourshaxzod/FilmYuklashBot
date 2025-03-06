@@ -10,7 +10,6 @@ class State
     public const STATE = 'state';
     public const SCREEN = 'screen';
 
-    // USER
     public const MAIN = 'main';
     public const SEARCH = 'search';
     public const FAVORITES = 'favorites';
@@ -18,7 +17,6 @@ class State
     public const CATEGORY = 'category';
     public const RECOMMENDATIONS = 'recommendations';
 
-    // ADM
     public const ADM_MAIN = 'adm_main';
     public const ADM_MOVIE = 'adm_movie';
     public const ADM_CHANNEL = 'adm_channel';
@@ -26,160 +24,142 @@ class State
     public const ADM_BROADCAST = 'adm_broadcast';
     public const ADM_STATISTIC = 'adm_statistic';
 
-    public static function get(Nutgram $bot, string $key = 'state')
+    public static function get(Nutgram $bot, string $key = 'state'): mixed
     {
         global $db;
 
         $userId = $bot->userId();
         if (!$userId) return null;
 
-        $stmt = $db->prepare("SELECT data FROM users WHERE user_id = ?");
-        $stmt->execute([$userId]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        try {
+            $stmt = $db->prepare("SELECT data FROM users WHERE user_id = ?");
+            $stmt->execute([$userId]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if (!$result || !$result['data']) {
+            if (!$result || empty($result['data'])) {
+                return null;
+            }
+
+            $data = json_decode($result['data'], true) ?? [];
+            return $data[$key] ?? null;
+        } catch (\Throwable $e) {
+            if (Config::isDebugMode()) {
+                error_log("Error getting state: " . $e->getMessage());
+            }
             return null;
         }
-
-        $data = json_decode($result['data'], true) ?? [];
-        return $data[$key] ?? null;
     }
 
-    public static function set(Nutgram $bot, string $key, $value)
+    public static function set(Nutgram $bot, string $key, mixed $value): bool
     {
         global $db;
 
         $userId = $bot->userId();
-        if (!$userId) return;
+        if (!$userId) return false;
 
-        $stmt = $db->prepare("SELECT data FROM users WHERE user_id = ?");
-        $stmt->execute([$userId]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        try {
+            $stmt = $db->prepare("SELECT data FROM users WHERE user_id = ?");
+            $stmt->execute([$userId]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        $data = [];
-        if ($result && $result['data']) {
-            $data = json_decode($result['data'], true) ?? [];
-        }
-
-        $data[$key] = $value;
-
-        $stmt = $db->prepare("UPDATE users SET data = ? WHERE user_id = ?");
-        $stmt->execute([json_encode($data), $userId]);
-    }
-
-    public static function clear(Nutgram $bot, ?array $keys = null)
-    {
-        global $db;
-
-        $userId = $bot->userId();
-        if (!$userId) return;
-
-        $stmt = $db->prepare("SELECT data FROM users WHERE user_id = ?");
-        $stmt->execute([$userId]);
-        $result = $stmt->fetch(PDO::FETCH_ASSOC);
-
-        if (!$result || !$result['data']) {
-            return;
-        }
-
-        $data = json_decode($result['data'], true) ?? [];
-
-        if ($keys === null) {
-            unset($data['state']);
-        } else {
-            foreach ($keys as $key) {
-                unset($data[$key]);
+            $data = [];
+            if ($result && !empty($result['data'])) {
+                $data = json_decode($result['data'], true) ?? [];
             }
-        }
 
-        $stmt = $db->prepare("UPDATE users SET data = ? WHERE user_id = ?");
-        $stmt->execute([json_encode($data), $userId]);
+            $data[$key] = $value;
+
+            $stmt = $db->prepare("UPDATE users SET data = ?, updated_at = NOW() WHERE user_id = ?");
+            $success = $stmt->execute([json_encode($data), $userId]);
+
+            return $success;
+        } catch (\Throwable $e) {
+            if (Config::isDebugMode()) {
+                error_log("Error setting state: " . $e->getMessage());
+            }
+            return false;
+        }
     }
 
-    public static function clearAll(Nutgram $bot)
+    public static function clear(Nutgram $bot, ?array $keys = null): bool
     {
         global $db;
 
         $userId = $bot->userId();
-        if (!$userId) return;
+        if (!$userId) return false;
 
-        $stmt = $db->prepare("UPDATE users SET data = NULL WHERE user_id = ?");
-        $stmt->execute([$userId]);
+        try {
+            $stmt = $db->prepare("SELECT data FROM users WHERE user_id = ?");
+            $stmt->execute([$userId]);
+            $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$result || empty($result['data'])) {
+                return true;
+            }
+
+            $data = json_decode($result['data'], true) ?? [];
+
+            if ($keys === null) {
+                unset($data['state']);
+            } else {
+                foreach ($keys as $key) {
+                    unset($data[$key]);
+                }
+            }
+
+            $stmt = $db->prepare("UPDATE users SET data = ?, updated_at = NOW() WHERE user_id = ?");
+            $success = $stmt->execute([json_encode($data), $userId]);
+
+            return $success;
+        } catch (\Throwable $e) {
+            if (Config::isDebugMode()) {
+                error_log("Error clearing state: " . $e->getMessage());
+            }
+            return false;
+        }
     }
 
-    public static function getState(Nutgram $bot)
+    public static function clearAll(Nutgram $bot): bool
     {
-        return self::get($bot, 'state');
+        global $db;
+
+        $userId = $bot->userId();
+        if (!$userId) return false;
+
+        try {
+            $stmt = $db->prepare("UPDATE users SET data = NULL, updated_at = NOW() WHERE user_id = ?");
+            $success = $stmt->execute([$userId]);
+
+            return $success;
+        } catch (\Throwable $e) {
+            if (Config::isDebugMode()) {
+                error_log("Error clearing all states: " . $e->getMessage());
+            }
+            return false;
+        }
     }
 
-    public static function setState(Nutgram $bot, $value)
+    public static function getState(Nutgram $bot): ?string
     {
-        self::set($bot, 'state', $value);
+        return self::get($bot, self::STATE);
     }
 
-    public static function getScreen(Nutgram $bot)
+    public static function setState(Nutgram $bot, ?string $value): bool
+    {
+        return self::set($bot, self::STATE, $value);
+    }
+
+    public static function getScreen(Nutgram $bot): ?string
     {
         return self::get($bot, self::SCREEN);
     }
 
-    public static function setScreen(Nutgram $bot, string $screen)
+    public static function setScreen(Nutgram $bot, string $screen): bool
     {
-        self::set($bot, self::SCREEN, $screen);
+        return self::set($bot, self::SCREEN, $screen);
     }
 
-
-    public static function getUserData(Nutgram $bot)
-    {
-        return $bot->getUserData('data') ?? [];
-    }
-
-    public static function startProcess(Nutgram $bot, string $process, array $data = [])
-    {
-        self::set($bot, 'process', $process);
-        self::set($bot, 'process_data', $data);
-        self::set($bot, 'process_step', 0);
-    }
-
-    public static function getProcessData(Nutgram $bot)
-    {
-        return self::get($bot, 'process_data') ?? [];
-    }
-
-    public static function updateProcessData(Nutgram $bot, array $data)
-    {
-        $currentData = self::getProcessData($bot);
-        self::set($bot, 'process_data', array_merge($currentData, $data));
-    }
-
-    public static function getProcessStep(Nutgram $bot)
-    {
-        return self::get($bot, 'process_step') ?? 0;
-    }
-
-    public static function setProcessStep(Nutgram $bot, int $step)
-    {
-        self::set($bot, 'process_step', $step);
-    }
-
-    public static function nextProcessStep(Nutgram $bot)
-    {
-        $step = self::getProcessStep($bot) + 1;
-        self::setProcessStep($bot, $step);
-        return $step;
-    }
-
-    public static function endProcess(Nutgram $bot)
-    {
-        self::clear($bot, ['process', 'process_data', 'process_step']);
-    }
-
-    public static function isMovieCreation(Nutgram $bot)
-    {
-        $state = self::getState($bot);
-        return $state === 'add_movie_confirm' || $state === 'add_movie_photo';
-    }
-
-    public static function isInState(Nutgram $bot, string|array $states)
+    public static function isInState(Nutgram $bot, string|array $states): bool
     {
         $currentState = self::getState($bot);
         if (is_array($states)) {

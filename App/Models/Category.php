@@ -8,11 +8,12 @@ use App\Helpers\Config;
 
 class Category
 {
-    public static function getAll(PDO $db, ?int $limit = null, int $offset = 0)
+    /**
+     * Get all categories
+     */
+    public static function getAll(PDO $db): array
     {
         try {
-            $limit = $limit ?? Config::getItemsPerPage();
-
             $sql = "
                 SELECT 
                     c.*,
@@ -21,21 +22,21 @@ class Category
                     categories c 
                 ORDER BY 
                     c.name ASC
-                LIMIT :limit OFFSET :offset
             ";
 
             $stmt = $db->prepare($sql);
-            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->bindValue(':offset', $offset, PDO::PARAM_INT);
             $stmt->execute();
 
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
-            throw new Exception("Kategoriyalarni olishda xatolik: " . $e->getMessage());
+            throw new Exception("Error getting categories: " . $e->getMessage());
         }
     }
 
-    public static function findById(PDO $db, int $id)
+    /**
+     * Find category by ID
+     */
+    public static function findById(PDO $db, int $id): ?array
     {
         try {
             $sql = "
@@ -60,11 +61,14 @@ class Category
 
             return $category;
         } catch (Exception $e) {
-            throw new Exception("Kategoriyani olishda xatolik: " . $e->getMessage());
+            throw new Exception("Error finding category: " . $e->getMessage());
         }
     }
 
-    public static function findBySlug(PDO $db, string $slug)
+    /**
+     * Find category by slug
+     */
+    public static function findBySlug(PDO $db, string $slug): ?array
     {
         try {
             $sql = "
@@ -89,11 +93,14 @@ class Category
 
             return $category;
         } catch (Exception $e) {
-            throw new Exception("Kategoriyani olishda xatolik: " . $e->getMessage());
+            throw new Exception("Error finding category: " . $e->getMessage());
         }
     }
 
-    public static function findByName(PDO $db, string $name)
+    /**
+     * Find category by name
+     */
+    public static function findByName(PDO $db, string $name): ?array
     {
         try {
             $sql = "
@@ -118,18 +125,21 @@ class Category
 
             return $category;
         } catch (Exception $e) {
-            throw new Exception("Kategoriyani olishda xatolik: " . $e->getMessage());
+            throw new Exception("Error finding category: " . $e->getMessage());
         }
     }
 
-    public static function create(PDO $db, array $data)
+    /**
+     * Create a new category
+     */
+    public static function create(PDO $db, array $data): int
     {
         try {
             $db->beginTransaction();
 
             $existingCategory = self::findByName($db, $data['name']);
             if ($existingCategory) {
-                throw new Exception("Bu nomdagi kategoriya allaqachon mavjud");
+                throw new Exception("A category with this name already exists");
             }
 
             if (!isset($data['slug']) || empty($data['slug'])) {
@@ -145,12 +155,12 @@ class Category
                 INSERT INTO categories (
                     name, 
                     slug, 
-                    description, 
+                    description,
                     created_at
                 ) VALUES (
                     :name, 
                     :slug, 
-                    :description, 
+                    :description,
                     NOW()
                 )
             ";
@@ -162,37 +172,42 @@ class Category
                 'description' => $data['description'] ?? null,
             ]);
 
-            $categoryId = $db->lastInsertId();
+            $categoryId = (int)$db->lastInsertId();
             $db->commit();
 
             return $categoryId;
         } catch (Exception $e) {
-            $db->rollBack();
-            throw new Exception("Kategoriya qo'shishda xatolik: " . $e->getMessage());
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw new Exception("Error adding category: " . $e->getMessage());
         }
     }
 
-    public static function update(PDO $db, int $id, array $data)
+    /**
+     * Update a category
+     */
+    public static function update(PDO $db, int $id, array $data): bool
     {
         try {
             $db->beginTransaction();
 
             $category = self::findById($db, $id);
             if (!$category) {
-                throw new Exception("Kategoriya topilmadi");
+                throw new Exception("Category not found");
             }
 
             if (isset($data['name']) && $data['name'] !== $category['name']) {
                 $existingCategory = self::findByName($db, $data['name']);
                 if ($existingCategory && $existingCategory['id'] != $id) {
-                    throw new Exception("Bu nomdagi kategoriya allaqachon mavjud");
+                    throw new Exception("A category with this name already exists");
                 }
             }
 
             if (isset($data['slug']) && $data['slug'] !== $category['slug']) {
                 $existingSlug = self::findBySlug($db, $data['slug']);
                 if ($existingSlug && $existingSlug['id'] != $id) {
-                    throw new Exception("Bu slugli kategoriya allaqachon mavjud");
+                    throw new Exception("A category with this slug already exists");
                 }
             }
 
@@ -208,7 +223,7 @@ class Category
 
             if (empty($fields)) {
                 $db->rollBack();
-                return;
+                return true;
             }
 
             $values['id'] = $id;
@@ -220,20 +235,26 @@ class Category
             $stmt->execute($values);
 
             $db->commit();
+            return true;
         } catch (Exception $e) {
-            $db->rollBack();
-            throw new Exception("Kategoriyani yangilashda xatolik: " . $e->getMessage());
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw new Exception("Error updating category: " . $e->getMessage());
         }
     }
 
-    public static function delete(PDO $db, int $id)
+    /**
+     * Delete a category
+     */
+    public static function delete(PDO $db, int $id): bool
     {
         try {
             $db->beginTransaction();
 
             $category = self::findById($db, $id);
             if (!$category) {
-                throw new Exception("Kategoriya topilmadi");
+                throw new Exception("Category not found");
             }
 
             $stmt = $db->prepare("DELETE FROM movie_categories WHERE category_id = ?");
@@ -246,23 +267,19 @@ class Category
             $stmt->execute([$id]);
 
             $db->commit();
+            return true;
         } catch (Exception $e) {
-            $db->rollBack();
-            throw new Exception("Kategoriyani o'chirishda xatolik: " . $e->getMessage());
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw new Exception("Error deleting category: " . $e->getMessage());
         }
     }
 
-    public static function getCount(PDO $db)
-    {
-        try {
-            $stmt = $db->query("SELECT COUNT(*) FROM categories");
-            return (int)$stmt->fetchColumn();
-        } catch (Exception $e) {
-            throw new Exception("Kategoriyalar sonini olishda xatolik: " . $e->getMessage());
-        }
-    }
-
-    public static function getByMovieId(PDO $db, int $movieId)
+    /**
+     * Get categories by movie ID
+     */
+    public static function getByMovieId(PDO $db, int $movieId): array
     {
         try {
             $sql = "
@@ -284,11 +301,14 @@ class Category
 
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
-            throw new Exception("Kino kategoriyalarini olishda xatolik: " . $e->getMessage());
+            throw new Exception("Error getting movie categories: " . $e->getMessage());
         }
     }
 
-    public static function saveMovieCategories(PDO $db, int $movieId, array $categoryIds)
+    /**
+     * Save movie categories
+     */
+    public static function saveMovieCategories(PDO $db, int $movieId, array $categoryIds): bool
     {
         try {
             $shouldCommit = !$db->inTransaction();
@@ -305,10 +325,8 @@ class Category
                 $placeholders = [];
 
                 foreach ($categoryIds as $categoryId) {
-
-                    $categoryId = (int)$categoryId;
                     $values[] = $movieId;
-                    $values[] = $categoryId;
+                    $values[] = (int)$categoryId;
                     $placeholders[] = "(?, ?)";
                 }
 
@@ -320,44 +338,20 @@ class Category
             if ($shouldCommit) {
                 $db->commit();
             }
+            
+            return true;
         } catch (Exception $e) {
             if ($shouldCommit && $db->inTransaction()) {
                 $db->rollBack();
             }
-            throw new Exception("Kino kategoriyalarini saqlashda xatolik: " . $e->getMessage());
+            throw new Exception("Error saving movie categories: " . $e->getMessage());
         }
     }
 
-    public static function getUserTopCategories(PDO $db, int $userId, int $limit = 5)
-    {
-        try {
-            $sql = "
-                SELECT 
-                    c.*,
-                    ui.score as interest_score
-                FROM 
-                    categories c
-                JOIN 
-                    user_interests ui ON c.id = ui.category_id
-                WHERE 
-                    ui.user_id = :user_id
-                ORDER BY 
-                    ui.score DESC
-                LIMIT :limit
-            ";
-
-            $stmt = $db->prepare($sql);
-            $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
-            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
-            $stmt->execute();
-
-            return $stmt->fetchAll(PDO::FETCH_ASSOC);
-        } catch (Exception $e) {
-            throw new Exception("Foydalanuvchi qiziqishlarini olishda xatolik: " . $e->getMessage());
-        }
-    }
-
-    public static function updateUserInterest(PDO $db, int $userId, int $categoryId, float $increment = 0.0)
+    /**
+     * Update user interest in a category
+     */
+    public static function updateUserInterest(PDO $db, int $userId, int $categoryId, float $increment = 0.0): bool
     {
         try {
             $needsTransaction = !$db->inTransaction();
@@ -371,7 +365,7 @@ class Category
                 if ($needsTransaction) {
                     $db->rollBack();
                 }
-                return;
+                return false;
             }
 
             $sql = "SELECT id, score FROM user_interests WHERE user_id = :user_id AND category_id = :category_id";
@@ -387,7 +381,7 @@ class Category
                     if ($needsTransaction) {
                         $db->rollBack();
                     }
-                    return;
+                    return false;
                 }
 
                 $sql = "INSERT INTO user_interests (user_id, category_id, score, updated_at) VALUES (:user_id, :category_id, :score, NOW())";
@@ -417,102 +411,73 @@ class Category
             if ($needsTransaction) {
                 $db->commit();
             }
+            
+            return true;
         } catch (Exception $e) {
             if ($needsTransaction && $db->inTransaction()) {
                 $db->rollBack();
             }
-            throw new Exception("Foydalanuvchi qiziqishini yangilashda xatolik: " . $e->getMessage());
+            throw new Exception("Error updating user interest: " . $e->getMessage());
         }
     }
 
-    private static function createSlug(string $name)
+    /**
+     * Get top categories for a user
+     */
+    public static function getUserTopCategories(PDO $db, int $userId, int $limit = 5): array
+    {
+        try {
+            $sql = "
+                SELECT 
+                    c.*,
+                    ui.score as interest_score
+                FROM 
+                    categories c
+                JOIN 
+                    user_interests ui ON c.id = ui.category_id
+                WHERE 
+                    ui.user_id = :user_id
+                ORDER BY 
+                    ui.score DESC
+                LIMIT :limit
+            ";
+
+            $stmt = $db->prepare($sql);
+            $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+            $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+            $stmt->execute();
+
+            return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            throw new Exception("Error getting user top categories: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Create a slug from a name
+     */
+    private static function createSlug(string $name): string
     {
         static $transliteration = [
-            'а' => 'a',
-            'б' => 'b',
-            'в' => 'v',
-            'г' => 'g',
-            'д' => 'd',
-            'е' => 'e',
-            'ё' => 'yo',
-            'ж' => 'j',
-            'з' => 'z',
-            'и' => 'i',
-            'й' => 'y',
-            'к' => 'k',
-            'л' => 'l',
-            'м' => 'm',
-            'н' => 'n',
-            'о' => 'o',
-            'п' => 'p',
-            'р' => 'r',
-            'с' => 's',
-            'т' => 't',
-            'у' => 'u',
-            'ф' => 'f',
-            'х' => 'h',
-            'ц' => 'ts',
-            'ч' => 'ch',
-            'ш' => 'sh',
-            'щ' => 'sch',
-            'ъ' => '',
-            'ы' => 'i',
-            'ь' => '',
-            'э' => 'e',
-            'ю' => 'yu',
-            'я' => 'ya',
-            'ў' => 'o',
-            'қ' => 'q',
-            'ғ' => 'g',
-            'ҳ' => 'h',
+            'а' => 'a', 'б' => 'b', 'в' => 'v', 'г' => 'g', 'д' => 'd', 'е' => 'e', 'ё' => 'yo',
+            'ж' => 'j', 'з' => 'z', 'и' => 'i', 'й' => 'y', 'к' => 'k', 'л' => 'l', 'м' => 'm',
+            'н' => 'n', 'о' => 'o', 'п' => 'p', 'р' => 'r', 'с' => 's', 'т' => 't', 'у' => 'u',
+            'ф' => 'f', 'х' => 'h', 'ц' => 'ts', 'ч' => 'ch', 'ш' => 'sh', 'щ' => 'sch', 'ъ' => '',
+            'ы' => 'i', 'ь' => '', 'э' => 'e', 'ю' => 'yu', 'я' => 'ya', 'ў' => 'o', 'қ' => 'q',
+            'ғ' => 'g', 'ҳ' => 'h',
 
-            'А' => 'a',
-            'Б' => 'b',
-            'В' => 'v',
-            'Г' => 'g',
-            'Д' => 'd',
-            'Е' => 'e',
-            'Ё' => 'yo',
-            'Ж' => 'j',
-            'З' => 'z',
-            'И' => 'i',
-            'Й' => 'y',
-            'К' => 'k',
-            'Л' => 'l',
-            'М' => 'm',
-            'Н' => 'n',
-            'О' => 'o',
-            'П' => 'p',
-            'Р' => 'r',
-            'С' => 's',
-            'Т' => 't',
-            'У' => 'u',
-            'Ф' => 'f',
-            'Х' => 'h',
-            'Ц' => 'ts',
-            'Ч' => 'ch',
-            'Ш' => 'sh',
-            'Щ' => 'sch',
-            'Ъ' => '',
-            'Ы' => 'i',
-            'Ь' => '',
-            'Э' => 'e',
-            'Ю' => 'yu',
-            'Я' => 'ya',
-            'Ў' => 'o',
-            'Қ' => 'q',
-            'Ғ' => 'g',
-            'Ҳ' => 'h'
+            'А' => 'a', 'Б' => 'b', 'В' => 'v', 'Г' => 'g', 'Д' => 'd', 'Е' => 'e', 'Ё' => 'yo',
+            'Ж' => 'j', 'З' => 'z', 'И' => 'i', 'Й' => 'y', 'К' => 'k', 'Л' => 'l', 'М' => 'm',
+            'Н' => 'n', 'О' => 'o', 'П' => 'p', 'Р' => 'r', 'С' => 's', 'Т' => 't', 'У' => 'u',
+            'Ф' => 'f', 'Х' => 'h', 'Ц' => 'ts', 'Ч' => 'ch', 'Ш' => 'sh', 'Щ' => 'sch', 'Ъ' => '',
+            'Ы' => 'i', 'Ь' => '', 'Э' => 'e', 'Ю' => 'yu', 'Я' => 'ya', 'Ў' => 'o', 'Қ' => 'q',
+            'Ғ' => 'g', 'Ҳ' => 'h'
         ];
 
         $slug = strtr($name, $transliteration);
-
         $slug = mb_strtolower($slug, 'UTF-8');
-
         $slug = preg_replace('/[^a-z0-9\s-]/', '', $slug);
-
         $slug = preg_replace('/[\s-]+/', '-', $slug);
-
         $slug = trim($slug, '-');
 
         return $slug;

@@ -8,38 +8,50 @@ use SergiX44\Nutgram\Nutgram;
 
 class Channel
 {
-    public static function getAll(PDO $db)
+    /**
+     * Get all channels
+     */
+    public static function getAll(PDO $db): array
     {
         try {
             $stmt = $db->query("SELECT * FROM channels ORDER BY created_at DESC");
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
-            throw new Exception("Kanallarni olishda xatolik: " . $e->getMessage());
+            throw new Exception("Error getting channels: " . $e->getMessage());
         }
     }
 
-    public static function getActive(PDO $db)
+    /**
+     * Get active channels
+     */
+    public static function getActive(PDO $db): array
     {
         try {
             $stmt = $db->query("SELECT * FROM channels WHERE is_active = 1 ORDER BY created_at DESC");
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
-            throw new Exception("Kanallarni olishda xatolik: " . $e->getMessage());
+            throw new Exception("Error getting active channels: " . $e->getMessage());
         }
     }
 
-    public static function find(PDO $db, int $id)
+    /**
+     * Find channel by ID
+     */
+    public static function find(PDO $db, int $id): ?array
     {
         try {
             $stmt = $db->prepare("SELECT * FROM channels WHERE id = ?");
             $stmt->execute([$id]);
             return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
         } catch (Exception $e) {
-            throw new Exception("Kanalni olishda xatolik: " . $e->getMessage());
+            throw new Exception("Error finding channel: " . $e->getMessage());
         }
     }
 
-    public static function findByUsername(PDO $db, string $username)
+    /**
+     * Find channel by username
+     */
+    public static function findByUsername(PDO $db, string $username): ?array
     {
         try {
             $username = ltrim($username, '@');
@@ -48,39 +60,25 @@ class Channel
             $stmt->execute([$username]);
             return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
         } catch (Exception $e) {
-            throw new Exception("Kanalni olishda xatolik: " . $e->getMessage());
+            throw new Exception("Error finding channel: " . $e->getMessage());
         }
     }
 
-    public static function findByChatId(PDO $db, int $chatId)
+    /**
+     * Create a new channel
+     */
+    public static function create(PDO $db, array $data): int
     {
         try {
-            $stmt = $db->prepare("SELECT * FROM channels WHERE chat_id = ?");
-            $stmt->execute([$chatId]);
-            return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
-        } catch (Exception $e) {
-            throw new Exception("Kanalni olishda xatolik: " . $e->getMessage());
-        }
-    }
-
-    public static function create(PDO $db, array $data)
-    {
-        try {
+            $db->beginTransaction();
 
             if (isset($data['username'])) {
                 $username = ltrim($data['username'], '@');
                 $existing = self::findByUsername($db, $username);
                 if ($existing) {
-                    throw new Exception("Bu username bilan kanal allaqachon mavjud");
+                    throw new Exception("A channel with this username already exists");
                 }
                 $data['username'] = $username;
-            }
-
-            if (isset($data['chat_id'])) {
-                $existing = self::findByChatId($db, $data['chat_id']);
-                if ($existing) {
-                    throw new Exception("Bu chat ID bilan kanal allaqachon mavjud");
-                }
             }
 
             $sql = "INSERT INTO channels (username, title, chat_id, is_active, created_at) 
@@ -94,100 +92,76 @@ class Channel
                 'is_active' => $data['is_active'] ?? true
             ]);
 
-            $channelId = $db->lastInsertId();
+            $channelId = (int)$db->lastInsertId();
+            $db->commit();
 
             return $channelId;
         } catch (Exception $e) {
-            throw new Exception("Kanal qo'shishda xatolik: " . $e->getMessage());
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw new Exception("Error adding channel: " . $e->getMessage());
         }
     }
 
-    public static function update(PDO $db, int $id, array $data)
+    /**
+     * Delete a channel
+     */
+    public static function delete(PDO $db, int $id): bool
     {
         try {
+            $db->beginTransaction();
+
             $channel = self::find($db, $id);
             if (!$channel) {
-                throw new Exception("Kanal topilmadi");
-            }
-
-            if (isset($data['username'])) {
-                $username = ltrim($data['username'], '@');
-                $existing = self::findByUsername($db, $username);
-                if ($existing && $existing['id'] != $id) {
-                    throw new Exception("Bu username bilan boshqa kanal mavjud");
-                }
-                $data['username'] = $username;
-            }
-
-            if (isset($data['chat_id']) && $data['chat_id'] != $channel['chat_id']) {
-                $existing = self::findByChatId($db, $data['chat_id']);
-                if ($existing && $existing['id'] != $id) {
-                    throw new Exception("Bu chat ID bilan boshqa kanal mavjud");
-                }
-            }
-
-            $fields = [];
-            $values = [];
-            foreach ($data as $field => $value) {
-                $fields[] = "$field = :$field";
-                $values[$field] = $value;
-            }
-            $values['id'] = $id;
-            $values['updated_at'] = date('Y-m-d H:i:s');
-
-            $sql = "UPDATE channels SET " . implode(', ', $fields) . ", updated_at = :updated_at WHERE id = :id";
-
-            $stmt = $db->prepare($sql);
-            $stmt->execute($values);
-        } catch (Exception $e) {
-            throw new Exception("Kanalni yangilashda xatolik: " . $e->getMessage());
-        }
-    }
-
-    public static function delete(PDO $db, int $id)
-    {
-        try {
-            $channel = self::find($db, $id);
-            if (!$channel) {
-                throw new Exception("Kanal topilmadi");
+                throw new Exception("Channel not found");
             }
 
             $stmt = $db->prepare("DELETE FROM channels WHERE id = ?");
             $stmt->execute([$id]);
+
+            $db->commit();
+            return true;
         } catch (Exception $e) {
-            throw new Exception("Kanalni o'chirishda xatolik: " . $e->getMessage());
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw new Exception("Error deleting channel: " . $e->getMessage());
         }
     }
 
-    public static function toggleActive(PDO $db, int $id)
+    /**
+     * Toggle channel active status
+     */
+    public static function toggleActive(PDO $db, int $id): bool
     {
         try {
+            $db->beginTransaction();
+
             $channel = self::find($db, $id);
             if (!$channel) {
-                throw new Exception("Kanal topilmadi");
+                throw new Exception("Channel not found");
             }
 
             $newStatus = !$channel['is_active'];
 
             $stmt = $db->prepare("UPDATE channels SET is_active = ?, updated_at = NOW() WHERE id = ?");
             $stmt->execute([$newStatus, $id]);
+
+            $db->commit();
             return $newStatus;
         } catch (Exception $e) {
-            throw new Exception("Kanal statusini o'zgartirishda xatolik: " . $e->getMessage());
+            if ($db->inTransaction()) {
+                $db->rollBack();
+            }
+            throw new Exception("Error toggling channel status: " . $e->getMessage());
         }
     }
 
-    public static function getCount(PDO $db)
-    {
-        try {
-            $stmt = $db->query("SELECT COUNT(*) FROM channels");
-            return (int)$stmt->fetchColumn();
-        } catch (Exception $e) {
-            throw new Exception("Kanallar sonini olishda xatolik: " . $e->getMessage());
-        }
-    }
-
-    public static function checkUserSubscription(Nutgram $bot, PDO $db, int $userId)
+    /**
+     * Check user subscription to all required channels
+     */
+    public static function checkUserSubscription(Nutgram $bot, PDO $db, int $userId): array
     {
         $channels = self::getActive($db);
         $notSubscribed = [];
@@ -212,7 +186,10 @@ class Channel
         return $notSubscribed;
     }
 
-    public static function checkBotIsAdmin(Nutgram $bot, string $username)
+    /**
+     * Check if bot is admin in a channel
+     */
+    public static function checkBotIsAdmin(Nutgram $bot, string $username): ?array
     {
         $username = ltrim($username, '@');
 

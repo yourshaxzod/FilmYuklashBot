@@ -12,7 +12,10 @@ use SergiX44\Nutgram\Telegram\Types\Keyboard\InlineKeyboardMarkup;
 
 class User
 {
-    public static function register(PDO $db, Nutgram $bot)
+    /**
+     * Register or update a user
+     */
+    public static function register(PDO $db, Nutgram $bot): ?array
     {
         try {
             $userId = $bot->userId();
@@ -26,7 +29,7 @@ class User
 
             if ($existingUser) {
                 $data = [
-                    'updated_at' => date("Y-m-d h:i:s"),
+                    'updated_at' => date("Y-m-d H:i:s"),
                 ];
 
                 self::update($db, $userId, $data);
@@ -51,13 +54,16 @@ class User
             return self::findById($db, $userId);
         } catch (Exception $e) {
             if (Config::isDebugMode()) {
-                error_log("Foydalanuvchini ro'yxatdan o'tkazishda xatolik: " . $e->getMessage());
+                error_log("Error registering user: " . $e->getMessage());
             }
             return null;
         }
     }
 
-    public static function findById(PDO $db, int $userId)
+    /**
+     * Find a user by ID
+     */
+    public static function findById(PDO $db, int $userId): ?array
     {
         try {
             $stmt = $db->prepare("SELECT * FROM users WHERE user_id = ?");
@@ -65,13 +71,16 @@ class User
             return $stmt->fetch(PDO::FETCH_ASSOC) ?: null;
         } catch (Exception $e) {
             if (Config::isDebugMode()) {
-                error_log("Foydalanuvchini olishda xatolik: " . $e->getMessage());
+                error_log("Error finding user: " . $e->getMessage());
             }
             return null;
         }
     }
 
-    public static function update(PDO $db, int $userId, array $data)
+    /**
+     * Update a user
+     */
+    public static function update(PDO $db, int $userId, array $data): bool
     {
         try {
             $fields = [];
@@ -92,39 +101,48 @@ class User
             return $result;
         } catch (Exception $e) {
             if (Config::isDebugMode()) {
-                error_log("Foydalanuvchini yangilashda xatolik: " . $e->getMessage());
+                error_log("Error updating user: " . $e->getMessage());
             }
             return false;
         }
     }
 
-    public static function block(PDO $db, int $userId)
+    /**
+     * Block a user
+     */
+    public static function block(PDO $db, int $userId): bool
     {
         try {
             $stmt = $db->prepare("UPDATE users SET status = 'blocked', updated_at = NOW() WHERE user_id = ?");
             return $stmt->execute([$userId]);
         } catch (Exception $e) {
             if (Config::isDebugMode()) {
-                error_log("Foydalanuvchini bloklashda xatolik: " . $e->getMessage());
+                error_log("Error blocking user: " . $e->getMessage());
             }
             return false;
         }
     }
 
-    public static function unblock(PDO $db, int $userId)
+    /**
+     * Unblock a user
+     */
+    public static function unblock(PDO $db, int $userId): bool
     {
         try {
             $stmt = $db->prepare("UPDATE users SET status = 'active', updated_at = NOW() WHERE user_id = ?");
             return $stmt->execute([$userId]);
         } catch (Exception $e) {
             if (Config::isDebugMode()) {
-                error_log("Foydalanuvchini blokdan chiqarishda xatolik: " . $e->getMessage());
+                error_log("Error unblocking user: " . $e->getMessage());
             }
             return false;
         }
     }
 
-    public static function isBlocked(PDO $db, int $userId)
+    /**
+     * Check if a user is blocked
+     */
+    public static function isBlocked(PDO $db, int $userId): bool
     {
         try {
             $stmt = $db->prepare("SELECT status FROM users WHERE user_id = ?");
@@ -134,13 +152,16 @@ class User
             return $status === 'blocked';
         } catch (Exception $e) {
             if (Config::isDebugMode()) {
-                error_log("Foydalanuvchi statusini tekshirishda xatolik: " . $e->getMessage());
+                error_log("Error checking user status: " . $e->getMessage());
             }
             return false;
         }
     }
 
-    public static function getAll(PDO $db, ?string $status = null, int $limit = 100, int $offset = 0)
+    /**
+     * Get all users
+     */
+    public static function getAll(PDO $db, ?string $status = null, int $limit = 100, int $offset = 0): array
     {
         try {
             $sql = "SELECT * FROM users";
@@ -161,13 +182,16 @@ class User
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
             if (Config::isDebugMode()) {
-                error_log("Foydalanuvchilarni olishda xatolik: " . $e->getMessage());
+                error_log("Error getting users: " . $e->getMessage());
             }
             return [];
         }
     }
 
-    public static function getActiveUsersCount(PDO $db, int $days = 7)
+    /**
+     * Get active users count
+     */
+    public static function getActiveUsersCount(PDO $db, int $days = 7): int
     {
         try {
             $sql = "SELECT COUNT(DISTINCT user_id) FROM users WHERE updated_at >= DATE_SUB(NOW(), INTERVAL ? DAY)";
@@ -177,13 +201,16 @@ class User
             return (int)$stmt->fetchColumn();
         } catch (Exception $e) {
             if (Config::isDebugMode()) {
-                error_log("Faol foydalanuvchilar sonini olishda xatolik: " . $e->getMessage());
+                error_log("Error getting active users count: " . $e->getMessage());
             }
             return 0;
         }
     }
 
-    public static function getNewUsersCount(PDO $db, int $days = 7)
+    /**
+     * Get new users count
+     */
+    public static function getNewUsersCount(PDO $db, int $days = 7): int
     {
         try {
             $sql = "SELECT COUNT(*) FROM users WHERE created_at >= DATE_SUB(NOW(), INTERVAL ? DAY)";
@@ -193,13 +220,16 @@ class User
             return (int)$stmt->fetchColumn();
         } catch (Exception $e) {
             if (Config::isDebugMode()) {
-                error_log("Yangi foydalanuvchilar sonini olishda xatolik: " . $e->getMessage());
+                error_log("Error getting new users count: " . $e->getMessage());
             }
             return 0;
         }
     }
 
-    public static function getUserStats(PDO $db, int $userId)
+    /**
+     * Get user statistics
+     */
+    public static function getUserStats(PDO $db, int $userId): array
     {
         try {
             $stats = [
@@ -248,7 +278,7 @@ class User
             return $stats;
         } catch (Exception $e) {
             if (Config::isDebugMode()) {
-                error_log("Foydalanuvchi statistikasini olishda xatolik: " . $e->getMessage());
+                error_log("Error getting user stats: " . $e->getMessage());
             }
             return [
                 'viewed_movies' => 0,
@@ -261,7 +291,10 @@ class User
         }
     }
 
-    public static function broadcast(Nutgram $bot, PDO $db, string $message, ?array $options = null)
+    /**
+     * Broadcast message to users
+     */
+    public static function broadcast(Nutgram $bot, PDO $db, string $message, ?array $options = null): array
     {
         $results = [
             'total' => 0,
@@ -309,6 +342,7 @@ class User
 
                     $results['sent']++;
 
+                    // Add a slight delay to avoid hitting rate limits
                     usleep(50000);
                 } catch (\Exception $e) {
                     $results['failed']++;
@@ -323,7 +357,7 @@ class User
             return $results;
         } catch (Exception $e) {
             if (Config::isDebugMode()) {
-                error_log("Xabar yuborishda xatolik: " . $e->getMessage());
+                error_log("Error broadcasting message: " . $e->getMessage());
             }
 
             $results['errors'][] = "Global error: " . $e->getMessage();

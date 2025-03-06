@@ -13,15 +13,14 @@ function createBot(): Nutgram
 
         $token = Config::get('BOT_TOKEN');
         if (empty($token)) {
-            throw new \Exception('Bot token kiritilmagan!');
+            throw new \Exception('Bot token is not set!');
         }
 
         $bot = new Nutgram($token);
-
         $bot->setRunningMode(Polling::class);
 
         return $bot;
     } catch (\Throwable $e) {
-        throw new \Exception('Botni yaratishda xatolik: ' . $e->getMessage());
+        throw new \Exception('Error creating bot: ' . $e->getMessage());
     }
 }
